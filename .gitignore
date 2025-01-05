@@ -1,0 +1,8 @@
+.direnv/
+
+*.o
+
+zig-out/
+.zig-cache/
+
+main
