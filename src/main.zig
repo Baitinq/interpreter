@@ -18,6 +18,12 @@ pub fn main() !void {
     const buf = try file.readToEndAlloc(allocator, 1 * 1024 * 1024);
     defer allocator.free(buf);
 
-    var tknizer = try tokenizer.Tokenizer.init(buf);
-    std.debug.print("Next: {any}\n", .{tknizer.next()});
+    std.debug.print("Buf:\n{s}\n", .{buf});
+
+    var sourceTokenizer = try tokenizer.Tokenizer.init(buf);
+    std.debug.print("Next: {any}\n", .{sourceTokenizer.next()});
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }
