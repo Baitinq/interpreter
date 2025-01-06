@@ -1,10 +1,13 @@
 const std = @import("std");
 const tokenizer = @import("tokenizer.zig");
+const parser = @import("parser.zig");
 
 pub fn main() !void {
     const pathLen = std.mem.len(std.os.argv[1]);
     const path = std.os.argv[1][0..pathLen];
     std.debug.print("Tokenizing! {s}\n", .{path});
+
+    //TODO: Repl mode
 
     const file = try std.fs.cwd().openFile(path, .{});
 
@@ -20,10 +23,20 @@ pub fn main() !void {
 
     std.debug.print("Buf:\n{s}\n", .{buf});
 
+    var token_list = std.ArrayList(tokenizer.Token).init(allocator);
+    defer token_list.deinit();
+
     var sourceTokenizer = try tokenizer.Tokenizer.init(buf);
     while (sourceTokenizer.next()) |token| {
+        try token_list.append(token);
+    }
+
+    for (token_list.items) |token| {
         std.debug.print("{any}\n", .{token});
     }
+
+    const ast = try parser.Parser.parse(token_list.items);
+    std.debug.print("AST: {any}\n", .{ast});
 }
 
 test {
