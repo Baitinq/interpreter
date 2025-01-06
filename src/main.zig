@@ -21,7 +21,9 @@ pub fn main() !void {
     std.debug.print("Buf:\n{s}\n", .{buf});
 
     var sourceTokenizer = try tokenizer.Tokenizer.init(buf);
-    std.debug.print("Next: {any}\n", .{sourceTokenizer.next()});
+    while (sourceTokenizer.next()) |token| {
+        std.debug.print("{any}\n", .{token});
+    }
 }
 
 test {

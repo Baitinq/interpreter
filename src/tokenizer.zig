@@ -8,11 +8,48 @@ pub const Tokenizer = struct {
         return Tokenizer{ .buf = buf, .offset = 0 };
     }
 
-    pub fn next(_: *Tokenizer) ?Token {
-        return null;
-        // return Token{
-        //     .LET = void{},
-        // };
+    pub fn next(self: *Tokenizer) ?Token {
+        defer self.offset += 1;
+        self.skip_whitespace();
+
+        if (self.offset >= self.buf.len) return null;
+
+        const c = self.buf[self.offset];
+
+        if (c == ';') return Token{ .SEMICOLON = void{} };
+        if (c == '(') return Token{ .LPAREN = void{} };
+        if (c == ')') return Token{ .RPAREN = void{} };
+        if (c == '=') return Token{ .EQUALS = void{} };
+
+        const string = self.consume_string();
+        self.offset -= 1;
+
+        if (std.mem.eql(u8, string, "let")) return Token{ .LET = void{} };
+        if (std.mem.eql(u8, string, "print")) return Token{ .PRINT = void{} };
+
+        if (std.fmt.parseInt(i32, string, 10) catch null) |i| return Token{ .NUMBER = i };
+
+        return Token{ .IDENTIFIER = string };
+    }
+
+    fn skip_whitespace(self: *Tokenizer) void {
+        while (true) {
+            if (self.offset >= self.buf.len) return;
+            const c = self.buf[self.offset];
+            if (!std.ascii.isWhitespace(c)) return;
+            self.offset += 1;
+        }
+    }
+
+    fn consume_string(self: *Tokenizer) []u8 {
+        const start = self.offset;
+        while (true) {
+            const c = self.buf[self.offset];
+
+            if (!std.ascii.isAlphanumeric(c)) return self.buf[start..self.offset];
+
+            self.offset += 1;
+        }
     }
 };
 
@@ -26,7 +63,6 @@ const TokenType = enum {
 
     // Literals
     NUMBER,
-    STRING,
 
     // Operators
     EQUALS,
@@ -42,7 +78,6 @@ pub const Token = union(TokenType) {
     PRINT: void,
     IDENTIFIER: []u8,
     NUMBER: i64,
-    STRING: []u8,
     EQUALS: void,
     SEMICOLON: void,
     LPAREN: void,
@@ -56,13 +91,14 @@ test "simple" {
         \\ print(i);
     ;
 
-    var tokenizer = try Tokenizer.init(@constCast(buf));
-
     var token_list = std.ArrayList(Token).init(std.testing.allocator);
+    defer token_list.deinit();
+
+    var tokenizer = try Tokenizer.init(@constCast(buf));
     while (tokenizer.next()) |token| {
         try token_list.append(token);
     }
-    try std.testing.expectEqualSlices(Token, &.{
+    try std.testing.expectEqualDeep(&.{
         Token{ .LET = void{} },
         Token{ .IDENTIFIER = @constCast("i") },
         Token{ .EQUALS = void{} },
