@@ -1,0 +1,9 @@
+Program ::= Statement+
+
+Statement ::= (VariableStatement | PrintStatement) SEMICOLON
+
+VariableStatement ::= ("let" IDENTIFIER | IDENTIFIER) EQUALS Expression
+
+PrintStatement :== PRINT LPAREN Expression RPAREN
+
+Expression :== NUMBER | IDENTIFIER | LPAREN Expression RPAREN
