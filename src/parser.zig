@@ -30,14 +30,65 @@ pub const Node = union(NodeType) {
 };
 
 pub const Parser = struct {
-    pub fn parse(_: []tokenizer.Token) !Node {
+    tokens: []tokenizer.Token,
+    offset: u32,
+
+    pub fn init(tokens: []tokenizer.Token) *Parser {
+        return @constCast(&Parser{
+            .tokens = tokens,
+            .offset = 0,
+        });
+    }
+
+    pub fn parse(parser: *Parser) !Node {
+        return parser.parse_program();
+    }
+
+    fn parse_program(_: *Parser) !Node {
         return Node{
             .NUMBER = .{ .value = 9 },
         };
     }
+
+    fn parse_identifier(self: *Parser) !Node {
+        const token = self.peek_token() orelse return error.InvalidArgument;
+
+        if (token != .IDENTIFIER) return error.InvalidArgument;
+
+        _ = self.consume_token();
+
+        return Node{ .IDENTIFIER = .{
+            .name = token.IDENTIFIER,
+        } };
+    }
+
+    fn consume_token(self: *Parser) ?tokenizer.Token {
+        if (self.offset >= self.tokens.len) return null;
+
+        defer self.offset += 1;
+
+        return self.tokens[self.offset];
+    }
+
+    fn peek_token(self: Parser) ?tokenizer.Token {
+        if (self.offset >= self.tokens.len) return null;
+
+        return self.tokens[self.offset];
+    }
 };
 
-test "simple" {
+test "parse identifier" {
+    const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
+        tokenizer.Token{ .IDENTIFIER = @constCast("i") },
+    });
+    var parser = Parser.init(tokens);
+    const ident = try parser.parse_identifier();
+    try std.testing.expectEqualDeep(Node{ .IDENTIFIER = .{
+        .name = @constCast("i"),
+    } }, ident);
+}
+
+test "simple e2e" {
     const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
         tokenizer.Token{ .LET = void{} },
         tokenizer.Token{ .IDENTIFIER = @constCast("i") },
@@ -46,7 +97,7 @@ test "simple" {
         tokenizer.Token{ .SEMICOLON = void{} },
     });
 
-    const ast = try Parser.parse(tokens);
+    const ast = try Parser.init(tokens).parse();
 
     try std.testing.expectEqualDeep(Node{ .PROGRAM = .{ .statements = @constCast(&[_]*Node{
         @constCast(&Node{ .VARIABLE_STATEMENT = .{ .is_declaration = true, .name = @constCast("i"), .expression = @constCast(&Node{

@@ -35,7 +35,7 @@ pub fn main() !void {
         std.debug.print("{any}\n", .{token});
     }
 
-    const ast = try parser.Parser.parse(token_list.items);
+    const ast = try parser.Parser.init(token_list.items).parse();
     std.debug.print("AST: {any}\n", .{ast});
 }
 
