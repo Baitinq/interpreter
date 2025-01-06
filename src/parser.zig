@@ -22,7 +22,7 @@ pub const Node = union(NodeType) {
         expression: *Node,
     },
     NUMBER: struct {
-        value: i32,
+        value: i64,
     },
     IDENTIFIER: struct {
         name: []const u8,
@@ -62,6 +62,18 @@ pub const Parser = struct {
         } };
     }
 
+    fn parse_number(self: *Parser) !Node {
+        const token = self.peek_token() orelse return error.InvalidArgument;
+
+        if (token != .NUMBER) return error.InvalidArgument;
+
+        _ = self.consume_token();
+
+        return Node{ .NUMBER = .{
+            .value = token.NUMBER,
+        } };
+    }
+
     fn consume_token(self: *Parser) ?tokenizer.Token {
         if (self.offset >= self.tokens.len) return null;
 
@@ -86,6 +98,17 @@ test "parse identifier" {
     try std.testing.expectEqualDeep(Node{ .IDENTIFIER = .{
         .name = @constCast("i"),
     } }, ident);
+}
+
+test "parse number" {
+    const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
+        tokenizer.Token{ .NUMBER = 7 },
+    });
+    var parser = Parser.init(tokens);
+    const number = try parser.parse_number();
+    try std.testing.expectEqualDeep(Node{ .NUMBER = .{
+        .value = 7,
+    } }, number);
 }
 
 test "simple e2e" {
