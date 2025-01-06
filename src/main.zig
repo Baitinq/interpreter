@@ -26,8 +26,8 @@ pub fn main() !void {
     var token_list = std.ArrayList(tokenizer.Token).init(allocator);
     defer token_list.deinit();
 
-    var sourceTokenizer = try tokenizer.Tokenizer.init(buf);
-    while (sourceTokenizer.next()) |token| {
+    var source_tokenizer = try tokenizer.Tokenizer.init(buf);
+    while (source_tokenizer.next()) |token| {
         try token_list.append(token);
     }
 
@@ -35,7 +35,9 @@ pub fn main() !void {
         std.debug.print("{any}\n", .{token});
     }
 
-    const ast = try parser.Parser.init(token_list.items).parse();
+    const source_parser = parser.Parser.init(token_list.items, allocator);
+    defer source_parser.deinit();
+    const ast = try source_parser.parse();
     std.debug.print("AST: {any}\n", .{ast});
 }
 
