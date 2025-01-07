@@ -50,22 +50,24 @@ pub const Parser = struct {
         return parser;
     }
 
-    pub fn deinit(self: *Parser, ast: *Node) void {
-        std.debug.assert(ast.* == .PROGRAM);
-        for (ast.PROGRAM.statements) |statement| {
-            switch (statement.*) {
-                .VARIABLE_STATEMENT => unreachable,
-                .PRINT_STATEMENT => |x| {
-                    self.allocator.destroy(x.expression);
-                },
-                .NUMBER => unreachable,
-                .IDENTIFIER => unreachable,
-                else => unreachable,
+    pub fn deinit(self: *Parser, ast: ?*Node) void {
+        if (ast != null) {
+            // std.debug.assert(ast.?.* == .PROGRAM);
+            for (ast.?.PROGRAM.statements) |statement| {
+                switch (statement.*) {
+                    .VARIABLE_STATEMENT => @panic("NOT IMPLEMENTED"),
+                    .PRINT_STATEMENT => |x| {
+                        self.allocator.destroy(x.expression);
+                    },
+                    .NUMBER => @panic("NOT IMPLEMENTED"),
+                    .IDENTIFIER => @panic("NOT IMPLEMENTED"),
+                    else => unreachable,
+                }
+                self.allocator.destroy(statement);
             }
-            self.allocator.destroy(statement);
+            self.allocator.free(ast.?.PROGRAM.statements);
+            self.allocator.destroy(ast.?);
         }
-        self.allocator.free(ast.PROGRAM.statements);
-        self.allocator.destroy(ast);
         self.allocator.destroy(self);
     }
 
