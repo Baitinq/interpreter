@@ -53,7 +53,7 @@ pub const Tokenizer = struct {
     }
 };
 
-const TokenType = enum {
+pub const TokenType = enum {
     // Keywords
     LET,
     PRINT,

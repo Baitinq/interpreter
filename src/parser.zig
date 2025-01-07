@@ -8,31 +8,30 @@ const ParserError = error{
 
 const NodeType = enum {
     PROGRAM,
+    STATEMENT,
     VARIABLE_STATEMENT,
     PRINT_STATEMENT,
-    NUMBER,
-    IDENTIFIER,
+    EXPRESSION,
 };
 
-pub const Node = union(NodeType) {
-    PROGRAM: struct {
-        statements: []*Node,
-    },
-    VARIABLE_STATEMENT: struct {
-        is_declaration: bool,
-        name: []const u8,
-        expression: *Node,
-    },
-    PRINT_STATEMENT: struct {
-        expression: *Node,
-    },
+pub const Node = union(NodeType) { PROGRAM: struct {
+    statements: []*Node,
+}, STATEMENT: struct {
+    statement: *Node,
+}, VARIABLE_STATEMENT: struct {
+    is_declaration: bool,
+    name: []const u8,
+    expression: *Node,
+}, PRINT_STATEMENT: struct {
+    expression: *Node,
+}, EXPRESSION: union {
     NUMBER: struct {
         value: i64,
     },
     IDENTIFIER: struct {
         name: []const u8,
     },
-};
+} };
 
 pub const Parser = struct {
     tokens: []tokenizer.Token,
@@ -50,18 +49,22 @@ pub const Parser = struct {
         return parser;
     }
 
+    //TODO: We maybe should use an arena alocator or smth
     pub fn deinit(self: *Parser, ast: ?*Node) void {
         if (ast != null) {
-            // std.debug.assert(ast.?.* == .PROGRAM);
+            std.debug.assert(ast.?.* == .PROGRAM);
             for (ast.?.PROGRAM.statements) |statement| {
                 switch (statement.*) {
-                    .VARIABLE_STATEMENT => @panic("NOT IMPLEMENTED"),
-                    .PRINT_STATEMENT => |x| {
-                        self.allocator.destroy(x.expression);
+                    .STATEMENT => |x| {
+                        switch (x.statement.*) {
+                            .PRINT_STATEMENT => |p| {
+                                self.allocator.destroy(p.expression);
+                            },
+                            else => @panic("NOT IMPLEMENTED"),
+                        }
+                        self.allocator.destroy(x.statement);
                     },
-                    .NUMBER => @panic("NOT IMPLEMENTED"),
-                    .IDENTIFIER => @panic("NOT IMPLEMENTED"),
-                    else => unreachable,
+                    else => @panic("NOT IMPLEMENTED"),
                 }
                 self.allocator.destroy(statement);
             }
@@ -89,55 +92,35 @@ pub const Parser = struct {
         return node;
     }
 
-    fn parse_identifier(self: *Parser) ParserError!*Node {
-        const token = self.peek_token() orelse return ParserError.ParsingError;
+    fn parse_statement(self: *Parser) ParserError!*Node {
+        //TODO: Add support for parsing variable declaration and assignment. Also here we shouldnt parse numbers/identifiers directly
+        const token = self.peek_token();
+        std.debug.print("PARSING: {any}\n", .{token});
 
-        if (token != .IDENTIFIER) return ParserError.ParsingError;
-
-        _ = self.consume_token();
-
-        const node = try self.allocator.create(Node);
-        node.* = .{ .IDENTIFIER = .{
-            .name = token.IDENTIFIER,
-        } };
-        return node;
-    }
-
-    fn parse_number(self: *Parser) ParserError!*Node {
-        const token = self.peek_token() orelse return ParserError.ParsingError;
-
-        if (token != .NUMBER) return ParserError.ParsingError;
-
-        _ = self.consume_token();
+        const print_statement = try self.parse_print_statement();
+        _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
 
         const node = try self.allocator.create(Node);
-        node.* = .{ .NUMBER = .{
-            .value = token.NUMBER,
-        } };
+        node.* = .{
+            .STATEMENT = .{
+                .statement = print_statement,
+            },
+        };
         return node;
     }
 
     fn parse_print_statement(self: *Parser) ParserError!*Node {
         // print + ( + statement + ) + ;
-        var token = self.consume_token() orelse return ParserError.ParsingError;
 
-        if (token != .PRINT) return ParserError.ParsingError;
+        _ = try self.accept_token(tokenizer.TokenType.PRINT);
 
-        token = self.consume_token() orelse return ParserError.ParsingError;
+        _ = try self.accept_token(tokenizer.TokenType.LPAREN);
 
-        if (token != .LPAREN) return ParserError.ParsingError;
-
-        const expression = try self.parse_statement();
+        const expression = try self.parse_expression();
 
         std.debug.print("PARSED expression: {any}\n", .{expression});
 
-        token = self.consume_token() orelse return ParserError.ParsingError;
-
-        if (token != .RPAREN) return ParserError.ParsingError;
-
-        token = self.consume_token() orelse return ParserError.ParsingError;
-
-        if (token != .SEMICOLON) return ParserError.ParsingError; //TODO: This should not be handled at this level
+        _ = try self.accept_token(tokenizer.TokenType.RPAREN);
 
         const node = try self.allocator.create(Node);
         node.* = .{
@@ -148,21 +131,42 @@ pub const Parser = struct {
         return node;
     }
 
-    fn parse_statement(self: *Parser) ParserError!*Node {
+    // Expression :== NUMBER | IDENTIFIER
+    fn parse_expression(self: *Parser) ParserError!*Node {
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
-        std.debug.print("TOKEN: {any}\n", .{token});
-
-        //TODO: Add support for parsing variable declaration and assignment. Also here we shouldnt parse numbers/identifiers directly
+        var node: *Node = undefined;
         if (token == .NUMBER) {
-            return self.parse_number();
-        } else if (token == .IDENTIFIER) {
-            return self.parse_identifier();
-        } else if (token == .PRINT) {
-            return self.parse_print_statement();
+            const a = try self.accept_token(tokenizer.TokenType.NUMBER);
+            node = try self.allocator.create(Node);
+            node.* = .{
+                .EXPRESSION = .{
+                    .NUMBER = .{
+                        .value = a.NUMBER,
+                    },
+                },
+            };
         } else {
-            return ParserError.ParsingError;
+            const a = try self.accept_token(tokenizer.TokenType.IDENTIFIER);
+            node = try self.allocator.create(Node);
+            node.* = .{
+                .EXPRESSION = .{
+                    .IDENTIFIER = .{
+                        .name = a.IDENTIFIER,
+                    },
+                },
+            };
         }
+
+        return node;
+    }
+
+    fn accept_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
+        const token = self.peek_token() orelse return ParserError.ParsingError;
+
+        if (token != expected_token) return ParserError.ParsingError;
+
+        return self.consume_token() orelse unreachable;
     }
 
     fn consume_token(self: *Parser) ?tokenizer.Token {
