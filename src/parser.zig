@@ -93,20 +93,38 @@ pub const Parser = struct {
     }
 
     fn parse_statement(self: *Parser) ParserError!*Node {
-        //TODO: Add support for parsing variable declaration and assignment. Also here we shouldnt parse numbers/identifiers directly
-        const token = self.peek_token();
+        //TODO: Add support for parsing variable declaration and assignment.
+        const token = self.peek_token() orelse return ParserError.ParsingError;
         std.debug.print("PARSING: {any}\n", .{token});
 
-        const print_statement = try self.parse_print_statement();
-        _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
+        //TODO: Cleanup (avoid dupl)
+        if (token == .PRINT) {
+            const print_statement = try self.parse_print_statement();
+            _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
 
-        const node = try self.allocator.create(Node);
-        node.* = .{
-            .STATEMENT = .{
-                .statement = print_statement,
-            },
-        };
-        return node;
+            const node = try self.allocator.create(Node);
+            node.* = .{
+                .STATEMENT = .{
+                    .statement = print_statement,
+                },
+            };
+            return node;
+        } else {
+            const variable_statement = try self.parse_variable_statement();
+            _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
+
+            const node = try self.allocator.create(Node);
+            node.* = .{
+                .STATEMENT = .{
+                    .statement = variable_statement,
+                },
+            };
+            return node;
+        }
+    }
+
+    fn parse_variable_statement(_: *Parser) ParserError!*Node {
+        @panic("UNIMPLEMENTED parse_variable_statement");
     }
 
     fn parse_print_statement(self: *Parser) ParserError!*Node {
