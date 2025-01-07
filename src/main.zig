@@ -3,13 +3,11 @@ const tokenizer = @import("tokenizer.zig");
 const parser = @import("parser.zig");
 
 pub fn main() !void {
+    const stdout = std.io.getStdOut().writer();
+    const stdin = std.io.getStdIn().reader();
+
     const pathLen = std.mem.len(std.os.argv[1]);
     const path = std.os.argv[1][0..pathLen];
-    std.debug.print("Tokenizing! {s}\n", .{path});
-
-    //TODO: Repl mode
-
-    const file = try std.fs.cwd().openFile(path, .{});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -18,9 +16,25 @@ pub fn main() !void {
         if (deinit_status == .leak) @panic("Memory leak detected!");
     }
 
-    const buf = try file.readToEndAlloc(allocator, 1 * 1024 * 1024);
-    defer allocator.free(buf);
+    if (std.mem.eql(u8, path, "-i")) {
+        while (true) {
+            try stdout.print("> ", .{});
 
+            const buf = try stdin.readUntilDelimiterAlloc(allocator, '\n', 1024);
+            defer allocator.free(buf);
+
+            try process_buf(buf, allocator);
+        }
+    } else {
+        std.debug.print("Tokenizing! {s}\n", .{path});
+        const file = try std.fs.cwd().openFile(path, .{});
+        const buf = try file.readToEndAlloc(allocator, 1 * 1024 * 1024);
+        defer allocator.free(buf);
+        try process_buf(buf, allocator);
+    }
+}
+
+fn process_buf(buf: []u8, allocator: std.mem.Allocator) !void {
     std.debug.print("Buf:\n{s}\n", .{buf});
 
     var token_list = std.ArrayList(tokenizer.Token).init(allocator);
