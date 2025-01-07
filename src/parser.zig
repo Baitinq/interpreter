@@ -52,10 +52,21 @@ pub const Parser = struct {
 
     pub fn deinit(self: *Parser, ast: *Node) void {
         std.debug.assert(ast.* == .PROGRAM);
-        std.debug.print("STATEMENTS FREE: {any}\n", .{ast.PROGRAM.statements.len});
         for (ast.PROGRAM.statements) |statement| {
-            self.allocator.destroy(statement); //TODO: We're missing frees of children. we also dont want to double free!
+            switch (statement.*) {
+                .VARIABLE_STATEMENT => unreachable,
+                .PRINT_STATEMENT => |x| {
+                    self.allocator.destroy(x.expression);
+                },
+                .NUMBER => unreachable,
+                .IDENTIFIER => unreachable,
+                else => unreachable,
+            }
+            self.allocator.destroy(statement);
         }
+        self.allocator.free(ast.PROGRAM.statements);
+        self.allocator.destroy(ast);
+        self.allocator.destroy(self);
     }
 
     pub fn parse(self: *Parser) !*Node {
@@ -64,8 +75,9 @@ pub const Parser = struct {
 
     fn parse_program(self: *Parser) !*Node {
         var nodes = std.ArrayList(*Node).init(self.allocator);
+        defer nodes.deinit();
         while (self.offset < self.tokens.len) {
-            try nodes.append(@constCast(try self.parse_statement())); //TODO: This is not good, should we be allocating mem for every node?
+            try nodes.append(@constCast(try self.parse_statement()));
         }
 
         const node = try self.allocator.create(Node);
@@ -128,7 +140,7 @@ pub const Parser = struct {
         const node = try self.allocator.create(Node);
         node.* = .{
             .PRINT_STATEMENT = .{
-                .expression = @constCast(expression), //TODO: Warning ptr
+                .expression = @constCast(expression),
             },
         };
         return node;
