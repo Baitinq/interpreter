@@ -2,7 +2,8 @@ const std = @import("std");
 const tokenizer = @import("tokenizer.zig");
 
 const ParserError = error{
-    Error,
+    ParsingError,
+    OutOfMemory,
 };
 
 const NodeType = enum {
@@ -39,89 +40,102 @@ pub const Parser = struct {
 
     allocator: std.mem.Allocator,
 
-    pub fn init(tokens: []tokenizer.Token, allocator: std.mem.Allocator) *Parser {
-        return @constCast(&Parser{
+    pub fn init(tokens: []tokenizer.Token, allocator: std.mem.Allocator) ParserError!*Parser {
+        const parser = try allocator.create(Parser);
+        parser.* = .{
             .tokens = tokens,
             .offset = 0,
             .allocator = allocator,
-        });
+        };
+        return parser;
     }
 
-    pub fn deinit(_: *Parser) void {
-        //TODO: We should somehow free the arraylist we created
+    pub fn deinit(self: *Parser, ast: *Node) void {
+        std.debug.assert(ast.* == .PROGRAM);
+        std.debug.print("STATEMENTS FREE: {any}\n", .{ast.PROGRAM.statements.len});
+        for (ast.PROGRAM.statements) |statement| {
+            self.allocator.destroy(statement); //TODO: We're missing frees of children. we also dont want to double free!
+        }
     }
 
-    pub fn parse(self: *Parser) !Node {
+    pub fn parse(self: *Parser) !*Node {
         return self.parse_program();
     }
 
-    fn parse_program(self: *Parser) !Node {
+    fn parse_program(self: *Parser) !*Node {
         var nodes = std.ArrayList(*Node).init(self.allocator);
         while (self.offset < self.tokens.len) {
-            std.debug.print("OFFSET: {any} - len: {any}\n", .{ self.offset, self.tokens.len });
-            try nodes.append(@constCast(&try self.parse_statement())); //TODO: This is not good, should we be allocating mem for every node?
+            try nodes.append(@constCast(try self.parse_statement())); //TODO: This is not good, should we be allocating mem for every node?
         }
 
-        return Node{ .PROGRAM = .{
-            .statements = nodes.items,
+        const node = try self.allocator.create(Node);
+        node.* = .{ .PROGRAM = .{
+            .statements = try nodes.toOwnedSlice(),
         } };
+        return node;
     }
 
-    fn parse_identifier(self: *Parser) ParserError!Node {
-        const token = self.peek_token() orelse return ParserError.Error;
+    fn parse_identifier(self: *Parser) ParserError!*Node {
+        const token = self.peek_token() orelse return ParserError.ParsingError;
 
-        if (token != .IDENTIFIER) return ParserError.Error;
+        if (token != .IDENTIFIER) return ParserError.ParsingError;
 
         _ = self.consume_token();
 
-        return Node{ .IDENTIFIER = .{
+        const node = try self.allocator.create(Node);
+        node.* = .{ .IDENTIFIER = .{
             .name = token.IDENTIFIER,
         } };
+        return node;
     }
 
-    fn parse_number(self: *Parser) ParserError!Node {
-        const token = self.peek_token() orelse return ParserError.Error;
+    fn parse_number(self: *Parser) ParserError!*Node {
+        const token = self.peek_token() orelse return ParserError.ParsingError;
 
-        if (token != .NUMBER) return ParserError.Error;
+        if (token != .NUMBER) return ParserError.ParsingError;
 
         _ = self.consume_token();
 
-        return Node{ .NUMBER = .{
+        const node = try self.allocator.create(Node);
+        node.* = .{ .NUMBER = .{
             .value = token.NUMBER,
         } };
+        return node;
     }
 
-    fn parse_print_statement(self: *Parser) ParserError!Node {
+    fn parse_print_statement(self: *Parser) ParserError!*Node {
         // print + ( + statement + ) + ;
-        var token = self.consume_token() orelse return ParserError.Error;
+        var token = self.consume_token() orelse return ParserError.ParsingError;
 
-        if (token != .PRINT) return ParserError.Error;
+        if (token != .PRINT) return ParserError.ParsingError;
 
-        token = self.consume_token() orelse return ParserError.Error;
+        token = self.consume_token() orelse return ParserError.ParsingError;
 
-        if (token != .LPAREN) return ParserError.Error;
+        if (token != .LPAREN) return ParserError.ParsingError;
 
         const expression = try self.parse_statement();
 
         std.debug.print("PARSED expression: {any}\n", .{expression});
 
-        token = self.consume_token() orelse return ParserError.Error;
+        token = self.consume_token() orelse return ParserError.ParsingError;
 
-        if (token != .RPAREN) return ParserError.Error;
+        if (token != .RPAREN) return ParserError.ParsingError;
 
-        token = self.consume_token() orelse return ParserError.Error;
+        token = self.consume_token() orelse return ParserError.ParsingError;
 
-        if (token != .SEMICOLON) return ParserError.Error; //TODO: This should not be handled at this level
+        if (token != .SEMICOLON) return ParserError.ParsingError; //TODO: This should not be handled at this level
 
-        return Node{
+        const node = try self.allocator.create(Node);
+        node.* = .{
             .PRINT_STATEMENT = .{
-                .expression = @constCast(&expression), //TODO: Warning ptr
+                .expression = @constCast(expression), //TODO: Warning ptr
             },
         };
+        return node;
     }
 
-    fn parse_statement(self: *Parser) ParserError!Node {
-        const token = self.peek_token() orelse return ParserError.Error;
+    fn parse_statement(self: *Parser) ParserError!*Node {
+        const token = self.peek_token() orelse return ParserError.ParsingError;
 
         std.debug.print("TOKEN: {any}\n", .{token});
 
@@ -133,7 +147,7 @@ pub const Parser = struct {
         } else if (token == .PRINT) {
             return self.parse_print_statement();
         } else {
-            return ParserError.Error;
+            return ParserError.ParsingError;
         }
     }
 
@@ -145,7 +159,7 @@ pub const Parser = struct {
         return self.tokens[self.offset];
     }
 
-    fn peek_token(self: Parser) ?tokenizer.Token {
+    fn peek_token(self: *Parser) ?tokenizer.Token {
         if (self.offset >= self.tokens.len) return null;
 
         return self.tokens[self.offset];

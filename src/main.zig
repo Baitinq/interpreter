@@ -35,9 +35,9 @@ pub fn main() !void {
         std.debug.print("{any}\n", .{token});
     }
 
-    const source_parser = parser.Parser.init(token_list.items, allocator);
-    defer source_parser.deinit();
+    const source_parser = try parser.Parser.init(token_list.items, allocator);
     const ast = try source_parser.parse();
+    defer source_parser.deinit(@constCast(ast));
     std.debug.print("AST: {any}\n", .{ast});
 }
 
