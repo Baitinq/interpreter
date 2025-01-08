@@ -49,10 +49,10 @@ fn process_buf(buf: []u8, allocator: std.mem.Allocator) !void {
         std.debug.print("{any}\n", .{token});
     }
 
-    const source_parser = try parser.Parser.init(token_list.items, allocator);
-    errdefer source_parser.deinit(null);
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    const source_parser = try parser.Parser.init(token_list.items, arena.allocator());
+    defer arena.deinit();
     const ast = try source_parser.parse();
-    defer source_parser.deinit(@constCast(ast));
     std.debug.print("AST: {any}\n", .{ast});
 }
 

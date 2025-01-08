@@ -49,31 +49,6 @@ pub const Parser = struct {
         return parser;
     }
 
-    //TODO: We maybe should use an arena alocator or smth
-    pub fn deinit(self: *Parser, ast: ?*Node) void {
-        if (ast != null) {
-            std.debug.assert(ast.?.* == .PROGRAM);
-            for (ast.?.PROGRAM.statements) |statement| {
-                switch (statement.*) {
-                    .STATEMENT => |x| {
-                        switch (x.statement.*) {
-                            .PRINT_STATEMENT => |p| {
-                                self.allocator.destroy(p.expression);
-                            },
-                            else => @panic("NOT IMPLEMENTED"),
-                        }
-                        self.allocator.destroy(x.statement);
-                    },
-                    else => @panic("NOT IMPLEMENTED"),
-                }
-                self.allocator.destroy(statement);
-            }
-            self.allocator.free(ast.?.PROGRAM.statements);
-            self.allocator.destroy(ast.?);
-        }
-        self.allocator.destroy(self);
-    }
-
     pub fn parse(self: *Parser) !*Node {
         return self.parse_program();
     }
