@@ -53,6 +53,7 @@ pub const Parser = struct {
         return self.parse_program();
     }
 
+    // Program ::= Statement+
     fn parse_program(self: *Parser) !*Node {
         var nodes = std.ArrayList(*Node).init(self.allocator);
         defer nodes.deinit();
@@ -67,6 +68,7 @@ pub const Parser = struct {
         return node;
     }
 
+    // Statement ::= (VariableStatement | PrintStatement) SEMICOLON
     fn parse_statement(self: *Parser) ParserError!*Node {
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
@@ -96,6 +98,7 @@ pub const Parser = struct {
         }
     }
 
+    // VariableStatement ::= ("let" IDENTIFIER | IDENTIFIER) EQUALS Expression
     fn parse_variable_statement(self: *Parser) ParserError!*Node {
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
@@ -122,9 +125,8 @@ pub const Parser = struct {
         return node;
     }
 
+    // PrintStatement :== PRINT LPAREN Expression RPAREN
     fn parse_print_statement(self: *Parser) ParserError!*Node {
-        // print + ( + statement + ) + ;
-
         _ = try self.accept_token(tokenizer.TokenType.PRINT);
 
         _ = try self.accept_token(tokenizer.TokenType.LPAREN);
