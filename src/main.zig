@@ -23,7 +23,9 @@ pub fn main() !void {
             const buf = try stdin.readUntilDelimiterAlloc(allocator, '\n', 1024);
             defer allocator.free(buf);
 
-            try process_buf(buf, allocator);
+            process_buf(buf, allocator) catch |err| {
+                try stdout.print("Error parsing line: {any}\n", .{err});
+            };
         }
     } else {
         std.debug.print("Tokenizing! {s}\n", .{path});
