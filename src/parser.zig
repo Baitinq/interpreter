@@ -68,9 +68,7 @@ pub const Parser = struct {
     }
 
     fn parse_statement(self: *Parser) ParserError!*Node {
-        //TODO: Add support for parsing variable declaration and assignment.
         const token = self.peek_token() orelse return ParserError.ParsingError;
-        std.debug.print("PARSING: {any}\n", .{token});
 
         //TODO: Cleanup (avoid dupl)
         if (token == .PRINT) {
@@ -98,8 +96,30 @@ pub const Parser = struct {
         }
     }
 
-    fn parse_variable_statement(_: *Parser) ParserError!*Node {
-        @panic("UNIMPLEMENTED parse_variable_statement");
+    fn parse_variable_statement(self: *Parser) ParserError!*Node {
+        const token = self.peek_token() orelse return ParserError.ParsingError;
+
+        var is_declaration: bool = false;
+        if (token == .LET) {
+            is_declaration = true;
+            _ = self.consume_token() orelse return ParserError.ParsingError;
+        }
+
+        const identifier = try self.accept_token(tokenizer.TokenType.IDENTIFIER);
+
+        _ = try self.accept_token(tokenizer.TokenType.EQUALS);
+
+        const expression = try self.parse_expression();
+
+        const node = try self.allocator.create(Node);
+        node.* = .{
+            .VARIABLE_STATEMENT = .{
+                .is_declaration = is_declaration,
+                .name = identifier.IDENTIFIER,
+                .expression = @constCast(expression),
+            },
+        };
+        return node;
     }
 
     fn parse_print_statement(self: *Parser) ParserError!*Node {
