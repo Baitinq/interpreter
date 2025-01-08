@@ -24,7 +24,7 @@ pub const Node = union(NodeType) { PROGRAM: struct {
     expression: *Node,
 }, PRINT_STATEMENT: struct {
     expression: *Node,
-}, EXPRESSION: union {
+}, EXPRESSION: union(enum) {
     NUMBER: struct {
         value: i64,
     },

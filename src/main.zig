@@ -1,6 +1,7 @@
 const std = @import("std");
 const tokenizer = @import("tokenizer.zig");
 const parser = @import("parser.zig");
+const evaluator = @import("evaluator.zig");
 
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
@@ -56,6 +57,11 @@ fn process_buf(buf: []u8, allocator: std.mem.Allocator) !void {
     defer arena.deinit();
     const ast = try source_parser.parse();
     std.debug.print("AST: {any}\n", .{ast});
+
+    const source_evaluator = try evaluator.Evaluator.init(allocator);
+    defer source_evaluator.deinit();
+    const result = try source_evaluator.evaluate_ast(ast);
+    std.debug.print("Evaluation result: {any}\n", .{result});
 }
 
 test {
