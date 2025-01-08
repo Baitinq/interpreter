@@ -61,11 +61,9 @@ pub const Parser = struct {
             try nodes.append(@constCast(try self.parse_statement()));
         }
 
-        const node = try self.allocator.create(Node);
-        node.* = .{ .PROGRAM = .{
+        return self.create_node(.{ .PROGRAM = .{
             .statements = try nodes.toOwnedSlice(),
-        } };
-        return node;
+        } });
     }
 
     // Statement ::= (VariableStatement | PrintStatement) SEMICOLON
@@ -77,24 +75,20 @@ pub const Parser = struct {
             const print_statement = try self.parse_print_statement();
             _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
 
-            const node = try self.allocator.create(Node);
-            node.* = .{
+            return self.create_node(.{
                 .STATEMENT = .{
                     .statement = print_statement,
                 },
-            };
-            return node;
+            });
         } else {
             const variable_statement = try self.parse_variable_statement();
             _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
 
-            const node = try self.allocator.create(Node);
-            node.* = .{
+            return self.create_node(.{
                 .STATEMENT = .{
                     .statement = variable_statement,
                 },
-            };
-            return node;
+            });
         }
     }
 
@@ -114,15 +108,13 @@ pub const Parser = struct {
 
         const expression = try self.parse_expression();
 
-        const node = try self.allocator.create(Node);
-        node.* = .{
+        return self.create_node(.{
             .VARIABLE_STATEMENT = .{
                 .is_declaration = is_declaration,
                 .name = identifier.IDENTIFIER,
                 .expression = @constCast(expression),
             },
-        };
-        return node;
+        });
     }
 
     // PrintStatement :== PRINT LPAREN Expression RPAREN
@@ -137,43 +129,36 @@ pub const Parser = struct {
 
         _ = try self.accept_token(tokenizer.TokenType.RPAREN);
 
-        const node = try self.allocator.create(Node);
-        node.* = .{
+        return self.create_node(.{
             .PRINT_STATEMENT = .{
                 .expression = @constCast(expression),
             },
-        };
-        return node;
+        });
     }
 
     // Expression :== NUMBER | IDENTIFIER
     fn parse_expression(self: *Parser) ParserError!*Node {
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
-        var node: *Node = undefined;
         if (token == .NUMBER) {
             const a = try self.accept_token(tokenizer.TokenType.NUMBER);
-            node = try self.allocator.create(Node);
-            node.* = .{
+            return self.create_node(.{
                 .EXPRESSION = .{
                     .NUMBER = .{
                         .value = a.NUMBER,
                     },
                 },
-            };
+            });
         } else {
             const a = try self.accept_token(tokenizer.TokenType.IDENTIFIER);
-            node = try self.allocator.create(Node);
-            node.* = .{
+            return self.create_node(.{
                 .EXPRESSION = .{
                     .IDENTIFIER = .{
                         .name = a.IDENTIFIER,
                     },
                 },
-            };
+            });
         }
-
-        return node;
     }
 
     fn accept_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
@@ -196,6 +181,12 @@ pub const Parser = struct {
         if (self.offset >= self.tokens.len) return null;
 
         return self.tokens[self.offset];
+    }
+
+    fn create_node(self: *Parser, node_value: Node) !*Node {
+        const node = try self.allocator.create(Node);
+        node.* = node_value;
+        return node;
     }
 };
 
