@@ -1,18 +1,26 @@
 const std = @import("std");
 const parser = @import("parser.zig");
 
+const EvaluatorError = error{
+    EvaluationError,
+};
+
 pub const Evaluator = struct {
+    variables: std.StringHashMap(?*parser.Node),
+
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) !*Evaluator {
         const evaluator = try allocator.create(Evaluator);
         evaluator.* = .{
+            .variables = std.StringHashMap(?*parser.Node).init(allocator),
             .allocator = allocator,
         };
         return evaluator;
     }
 
     pub fn deinit(self: *Evaluator) void {
+        self.variables.deinit();
         self.allocator.destroy(self);
     }
 
@@ -38,9 +46,18 @@ pub const Evaluator = struct {
         };
     }
 
-    fn evaluate_variable_statement(_: *Evaluator, variable_statement: *parser.Node) !void {
-        std.debug.assert(variable_statement.* == parser.Node.VARIABLE_STATEMENT);
-        @panic("evaluate_variable_statement unimplemented");
+    fn evaluate_variable_statement(self: *Evaluator, node: *parser.Node) !void {
+        std.debug.assert(node.* == parser.Node.VARIABLE_STATEMENT);
+
+        const variable_statement = node.VARIABLE_STATEMENT;
+
+        if (variable_statement.is_declaration) {
+            try self.variables.put(variable_statement.name, null);
+        }
+
+        std.debug.assert(self.variables.contains(variable_statement.name));
+
+        try self.variables.put(variable_statement.name, node.VARIABLE_STATEMENT.expression); //TODO: We really should enforce this at the compiler level
     }
 
     fn evaluate_print_statement(self: *Evaluator, print_statement: *parser.Node) !void {
@@ -51,12 +68,15 @@ pub const Evaluator = struct {
         std.debug.print("PRINT: {d}\n", .{print_value});
     }
 
-    fn get_expression_value(_: *Evaluator, expression: *parser.Node) !i64 {
-        std.debug.assert(expression.* == parser.Node.EXPRESSION);
+    fn get_expression_value(self: *Evaluator, node: *parser.Node) !i64 {
+        std.debug.assert(node.* == parser.Node.EXPRESSION);
 
-        return switch (expression.EXPRESSION) {
+        return switch (node.EXPRESSION) {
             .NUMBER => |number| number.value,
-            .IDENTIFIER => @panic("printing identifiers not implemented"),
+            .IDENTIFIER => |identifier| {
+                const expression = self.variables.get(identifier.name) orelse return EvaluatorError.EvaluationError;
+                return try self.get_expression_value(expression.?);
+            },
         };
     }
 };
