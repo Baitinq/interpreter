@@ -70,26 +70,18 @@ pub const Parser = struct {
     fn parse_statement(self: *Parser) ParserError!*Node {
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
-        //TODO: Cleanup (avoid dupl)
-        if (token == .PRINT) {
-            const print_statement = try self.parse_print_statement();
-            _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
+        const statement = switch (token) {
+            .PRINT => try self.parse_print_statement(),
+            else => try self.parse_variable_statement(),
+        };
 
-            return self.create_node(.{
-                .STATEMENT = .{
-                    .statement = print_statement,
-                },
-            });
-        } else {
-            const variable_statement = try self.parse_variable_statement();
-            _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
+        _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
 
-            return self.create_node(.{
-                .STATEMENT = .{
-                    .statement = variable_statement,
-                },
-            });
-        }
+        return self.create_node(.{
+            .STATEMENT = .{
+                .statement = statement,
+            },
+        });
     }
 
     // VariableStatement ::= ("let" IDENTIFIER | IDENTIFIER) EQUALS Expression
@@ -125,8 +117,6 @@ pub const Parser = struct {
 
         const expression = try self.parse_expression();
 
-        std.debug.print("PARSED expression: {any}\n", .{expression});
-
         _ = try self.accept_token(tokenizer.TokenType.RPAREN);
 
         return self.create_node(.{
@@ -138,27 +128,25 @@ pub const Parser = struct {
 
     // Expression :== NUMBER | IDENTIFIER
     fn parse_expression(self: *Parser) ParserError!*Node {
-        const token = self.peek_token() orelse return ParserError.ParsingError;
+        const token = self.consume_token() orelse return ParserError.ParsingError;
 
-        if (token == .NUMBER) {
-            const a = try self.accept_token(tokenizer.TokenType.NUMBER);
-            return self.create_node(.{
+        return switch (token) {
+            .NUMBER => |number_token| self.create_node(.{
                 .EXPRESSION = .{
                     .NUMBER = .{
-                        .value = a.NUMBER,
+                        .value = number_token,
                     },
                 },
-            });
-        } else {
-            const a = try self.accept_token(tokenizer.TokenType.IDENTIFIER);
-            return self.create_node(.{
+            }),
+            .IDENTIFIER => |identifier_token| self.create_node(.{
                 .EXPRESSION = .{
                     .IDENTIFIER = .{
-                        .name = a.IDENTIFIER,
+                        .name = identifier_token,
                     },
                 },
-            });
-        }
+            }),
+            else => unreachable,
+        };
     }
 
     fn accept_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
