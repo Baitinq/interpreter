@@ -103,7 +103,7 @@ pub const Parser = struct {
         return self.create_node(.{
             .VARIABLE_STATEMENT = .{
                 .is_declaration = is_declaration,
-                .name = identifier.IDENTIFIER,
+                .name = try self.allocator.dupe(u8, identifier.IDENTIFIER),
                 .expression = @constCast(expression),
             },
         });
@@ -141,7 +141,7 @@ pub const Parser = struct {
             .IDENTIFIER => |identifier_token| self.create_node(.{
                 .EXPRESSION = .{
                     .IDENTIFIER = .{
-                        .name = identifier_token,
+                        .name = try self.allocator.dupe(u8, identifier_token),
                     },
                 },
             }),

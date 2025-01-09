@@ -17,6 +17,12 @@ pub fn main() !void {
         if (deinit_status == .leak) @panic("Memory leak detected!");
     }
 
+    const source_evaluator = try evaluator.Evaluator.init(allocator);
+    defer source_evaluator.deinit();
+
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
     if (std.mem.eql(u8, path, "-i")) {
         while (true) {
             try stdout.print("> ", .{});
@@ -24,8 +30,8 @@ pub fn main() !void {
             const buf = try stdin.readUntilDelimiterAlloc(allocator, '\n', 1024);
             defer allocator.free(buf);
 
-            process_buf(buf, allocator) catch |err| {
-                try stdout.print("Error parsing line: {any}\n", .{err});
+            process_buf(buf, allocator, &arena, source_evaluator) catch |err| {
+                try stdout.print("Error processing line: {any}\n", .{err});
             };
         }
     } else {
@@ -33,11 +39,11 @@ pub fn main() !void {
         const file = try std.fs.cwd().openFile(path, .{});
         const buf = try file.readToEndAlloc(allocator, 1 * 1024 * 1024);
         defer allocator.free(buf);
-        try process_buf(buf, allocator);
+        try process_buf(buf, allocator, &arena, source_evaluator);
     }
 }
 
-fn process_buf(buf: []u8, allocator: std.mem.Allocator) !void {
+fn process_buf(buf: []u8, allocator: std.mem.Allocator, arena: *std.heap.ArenaAllocator, source_evaluator: *evaluator.Evaluator) !void {
     std.debug.print("Buf:\n{s}\n", .{buf});
 
     var token_list = std.ArrayList(tokenizer.Token).init(allocator);
@@ -52,14 +58,10 @@ fn process_buf(buf: []u8, allocator: std.mem.Allocator) !void {
         std.debug.print("{any}\n", .{token});
     }
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
     const source_parser = try parser.Parser.init(token_list.items, arena.allocator());
-    defer arena.deinit();
     const ast = try source_parser.parse();
     std.debug.print("AST: {any}\n", .{ast});
 
-    const source_evaluator = try evaluator.Evaluator.init(allocator);
-    defer source_evaluator.deinit();
     const result = try source_evaluator.evaluate_ast(ast);
     std.debug.print("Evaluation result: {any}\n", .{result});
 }
