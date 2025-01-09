@@ -44,6 +44,8 @@ pub const Tokenizer = struct {
     fn consume_string(self: *Tokenizer) []u8 {
         const start = self.offset;
         while (true) {
+            if (self.offset >= self.buf.len) return self.buf[start..self.offset];
+
             const c = self.buf[self.offset];
 
             if (!std.ascii.isAlphanumeric(c)) return self.buf[start..self.offset];
