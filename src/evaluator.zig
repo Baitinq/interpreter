@@ -80,3 +80,28 @@ pub const Evaluator = struct {
         };
     }
 };
+
+test "simple" {
+    const ast = &parser.Node{ .PROGRAM = .{ .statements = @constCast(&[_]*parser.Node{ @constCast(&parser.Node{ .STATEMENT = .{ .statement = @constCast(&parser.Node{ .VARIABLE_STATEMENT = .{
+        .is_declaration = true,
+        .name = @constCast("i"),
+        .expression = @constCast(&parser.Node{ .EXPRESSION = .{
+            .NUMBER = .{ .value = 2 },
+        } }),
+    } }) } }), @constCast(&parser.Node{ .STATEMENT = .{ .statement = @constCast(&parser.Node{
+        .VARIABLE_STATEMENT = .{
+            .is_declaration = false,
+            .name = @constCast("i"),
+            .expression = @constCast(&parser.Node{ .EXPRESSION = .{
+                .NUMBER = .{ .value = 2 },
+            } }),
+        },
+    }) } }) }) } };
+
+    var evaluator = try Evaluator.init(std.testing.allocator);
+    defer evaluator.deinit();
+
+    const evaluation_result = try evaluator.evaluate_ast(@constCast(ast));
+
+    try std.testing.expectEqual(0, evaluation_result);
+}
