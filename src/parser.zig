@@ -186,59 +186,69 @@ test "parse print" {
         tokenizer.Token{ .RPAREN = void{} },
         tokenizer.Token{ .SEMICOLON = void{} },
     });
-    var parser = Parser.init(tokens);
-    const print = try parser.parse_print_statement();
-    std.debug.print("PRINT: {any}\n", .{print});
-    //TODO: Warning ptr
-    // try std.testing.expectEqualDeep(Node{ .PRINT_STATEMENT = .{ .expression = @constCast(&Node{ .NUMBER = .{
-    //     .value = 7,
-    // } }) } }, print);
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var parser = try Parser.init(tokens, arena.allocator());
+    const actualNode = try parser.parse_print_statement();
     const expectedNode = Node{ .PRINT_STATEMENT = .{
-        .expression = @constCast(&Node{ .NUMBER = .{
-            .value = 9,
+        .expression = @constCast(&Node{ .EXPRESSION = .{
+            .NUMBER = .{ .value = 7 },
         } }),
     } };
-    std.debug.print("EXPECTED: {any}\n", .{expectedNode});
-    // TODO: This seems bugged with recursive types maybe?
-    // try std.testing.expectEqualDeep(expectedNode, print);
+    try std.testing.expectEqualDeep(&expectedNode, actualNode);
 }
 
-// test "parse identifier" {
-//     const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
-//         tokenizer.Token{ .IDENTIFIER = @constCast("i") },
-//     });
-//     var parser = Parser.init(tokens);
-//     const ident = try parser.parse_identifier();
-//     try std.testing.expectEqualDeep(Node{ .IDENTIFIER = .{
-//         .name = @constCast("i"),
-//     } }, ident);
-// }
-//
-// test "narse number" {
-//     const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
-//         tokenizer.Token{ .NUMBER = 7 },
-//     });
-//     var parser = Parser.init(tokens);
-//     const number = try parser.parse_number();
-//     try std.testing.expectEqualDeep(Node{ .NUMBER = .{
-//         .value = 7,
-//     } }, number);
-// }
-//
-// test "simple e2e" {
-//     const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
-//         tokenizer.Token{ .LET = void{} },
-//         tokenizer.Token{ .IDENTIFIER = @constCast("i") },
-//         tokenizer.Token{ .EQUALS = void{} },
-//         tokenizer.Token{ .NUMBER = 2 },
-//         tokenizer.Token{ .SEMICOLON = void{} },
-//     });
-//
-//     const ast = try Parser.init(tokens).parse();
-//
-//     try std.testing.expectEqualDeep(Node{ .PROGRAM = .{ .statements = @constCast(&[_]*Node{
-//         @constCast(&Node{ .VARIABLE_STATEMENT = .{ .is_declaration = true, .name = @constCast("i"), .expression = @constCast(&Node{
-//             .NUMBER = .{ .value = 2 },
-//         }) } }),
-//     }) } }, ast);
-// }
+test "parse identifier" {
+    const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
+        tokenizer.Token{ .IDENTIFIER = @constCast("i") },
+    });
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var parser = try Parser.init(tokens, arena.allocator());
+    const actualNode = try parser.parse_expression();
+    const expectedNode = Node{ .EXPRESSION = .{
+        .IDENTIFIER = .{
+            .name = @constCast("i"),
+        },
+    } };
+    try std.testing.expectEqualDeep(&expectedNode, actualNode);
+}
+
+test "parse number" {
+    const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
+        tokenizer.Token{ .NUMBER = 12 },
+    });
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var parser = try Parser.init(tokens, arena.allocator());
+    const actualNode = try parser.parse_expression();
+    const expectedNode = Node{ .EXPRESSION = .{
+        .NUMBER = .{
+            .value = 12,
+        },
+    } };
+    try std.testing.expectEqualDeep(&expectedNode, actualNode);
+}
+
+test "simple e2e" {
+    const tokens: []tokenizer.Token = @constCast(&[_]tokenizer.Token{
+        tokenizer.Token{ .LET = void{} },
+        tokenizer.Token{ .IDENTIFIER = @constCast("i") },
+        tokenizer.Token{ .EQUALS = void{} },
+        tokenizer.Token{ .NUMBER = 2 },
+        tokenizer.Token{ .SEMICOLON = void{} },
+    });
+
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var parser = try Parser.init(tokens, arena.allocator());
+    const ast = try parser.parse();
+    const expected_ast = Node{ .PROGRAM = .{ .statements = @constCast(&[_]*Node{@constCast(&Node{ .STATEMENT = .{ .statement = @constCast(&Node{ .VARIABLE_STATEMENT = .{
+        .is_declaration = true,
+        .name = @constCast("i"),
+        .expression = @constCast(&Node{ .EXPRESSION = .{
+            .NUMBER = .{ .value = 2 },
+        } }),
+    } }) } })}) } };
+    try std.testing.expectEqualDeep(&expected_ast, ast);
+}
