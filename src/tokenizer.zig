@@ -87,29 +87,50 @@ pub const Token = union(TokenType) {
 };
 
 test "simple" {
-    const buf =
-        \\ let i = 2;
-        \\
-        \\ print(i);
-    ;
+    // TODO: Add invalid src test
+    const tests = [_]struct {
+        buf: []u8,
+        tokens: []const Token,
+    }{
+        .{
+            .buf = @constCast(
+                \\ let i = 2;
+                \\
+                \\ print(i);
+            ),
+            .tokens = &[_]Token{
+                Token{ .LET = {} },
+                Token{ .IDENTIFIER = @constCast("i") },
+                Token{ .EQUALS = {} },
+                Token{ .NUMBER = 2 },
+                Token{ .SEMICOLON = {} },
+                Token{ .PRINT = {} },
+                Token{ .LPAREN = {} },
+                Token{ .IDENTIFIER = @constCast("i") },
+                Token{ .RPAREN = {} },
+                Token{ .SEMICOLON = {} },
+            },
+        },
+        .{
+            .buf = @constCast(
+                \\
+                \\ let hello
+            ),
+            .tokens = &[_]Token{
+                Token{ .LET = {} },
+                Token{ .IDENTIFIER = @constCast("hello") },
+            },
+        },
+    };
 
-    var token_list = std.ArrayList(Token).init(std.testing.allocator);
-    defer token_list.deinit();
+    for (tests) |t| {
+        var token_list = std.ArrayList(Token).init(std.testing.allocator);
+        defer token_list.deinit();
 
-    var tokenizer = try Tokenizer.init(@constCast(buf));
-    while (tokenizer.next()) |token| {
-        try token_list.append(token);
+        var tokenizer = try Tokenizer.init(t.buf);
+        while (tokenizer.next()) |token| {
+            try token_list.append(token);
+        }
+        try std.testing.expectEqualDeep(t.tokens, token_list.items);
     }
-    try std.testing.expectEqualDeep(&.{
-        Token{ .LET = void{} },
-        Token{ .IDENTIFIER = @constCast("i") },
-        Token{ .EQUALS = void{} },
-        Token{ .NUMBER = 2 },
-        Token{ .SEMICOLON = void{} },
-        Token{ .PRINT = void{} },
-        Token{ .LPAREN = void{} },
-        Token{ .IDENTIFIER = @constCast("i") },
-        Token{ .RPAREN = void{} },
-        Token{ .SEMICOLON = void{} },
-    }, token_list.items);
 }
