@@ -38,6 +38,17 @@ pub fn build(b: *std.Build) void {
     // step when running `zig build`).
     b.installArtifact(exe);
 
+    // This is needed for better lsp errors
+    const exe_check = b.addExecutable(.{
+        .name = "interpreter-lsp",
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const check = b.step("check", "Check if foo compiles");
+    check.dependOn(&exe_check.step);
+
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
     // such a dependency.

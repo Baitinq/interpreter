@@ -21,6 +21,7 @@
       pkgs.mkShell {
         buildInputs = with pkgs; [
             zig.packages."${system}".master
+            zls
         ];
       };
   in {
