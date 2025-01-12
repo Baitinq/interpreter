@@ -8,6 +8,7 @@ pub const TokenType = enum {
     // Keywords
     LET,
     PRINT,
+    RETURN,
 
     // Identifiers
     IDENTIFIER,
@@ -28,6 +29,7 @@ pub const TokenType = enum {
 pub const Token = union(TokenType) {
     LET: void,
     PRINT: void,
+    RETURN: void,
     IDENTIFIER: []u8,
     NUMBER: i64,
     EQUALS: void,
@@ -64,6 +66,7 @@ pub const Tokenizer = struct {
 
         if (std.mem.eql(u8, string, "let")) return Token{ .LET = void{} };
         if (std.mem.eql(u8, string, "print")) return Token{ .PRINT = void{} };
+        if (std.mem.eql(u8, string, "return")) return Token{ .RETURN = void{} };
 
         if (std.fmt.parseInt(i32, string, 10) catch null) |i| return Token{ .NUMBER = i };
 

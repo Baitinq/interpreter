@@ -11,6 +11,7 @@ const NodeType = enum {
     STATEMENT,
     VARIABLE_STATEMENT,
     PRINT_STATEMENT,
+    RETURN_STATEMENT,
     EXPRESSION,
 };
 
@@ -27,6 +28,9 @@ pub const Node = union(NodeType) {
         expression: *Node,
     },
     PRINT_STATEMENT: struct {
+        expression: *Node,
+    },
+    RETURN_STATEMENT: struct {
         expression: *Node,
     },
     EXPRESSION: union(enum) {
@@ -84,6 +88,7 @@ pub const Parser = struct {
 
         const statement = switch (token) {
             .PRINT => try self.parse_print_statement(),
+            .RETURN => try self.parse_return_statement(),
             else => try self.parse_variable_statement(),
         };
 
@@ -133,6 +138,20 @@ pub const Parser = struct {
 
         return self.create_node(.{
             .PRINT_STATEMENT = .{
+                .expression = @constCast(expression),
+            },
+        });
+    }
+
+    // ReturnStatement :== RETURN Expression
+    fn parse_return_statement(self: *Parser) ParserError!*Node {
+        errdefer std.debug.print("Error parsing return statement\n", .{});
+        _ = try self.accept_token(tokenizer.TokenType.RETURN);
+
+        const expression = try self.parse_expression();
+
+        return self.create_node(.{
+            .RETURN_STATEMENT = .{
                 .expression = @constCast(expression),
             },
         });

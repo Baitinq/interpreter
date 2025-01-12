@@ -8,6 +8,7 @@ const EvaluatorError = error{
 
 pub const Evaluator = struct {
     variables: std.StringHashMap(?i64),
+    return_value: i64,
 
     allocator: std.mem.Allocator,
 
@@ -16,6 +17,7 @@ pub const Evaluator = struct {
         evaluator.* = .{
             .variables = std.StringHashMap(?i64).init(allocator),
             .allocator = allocator,
+            .return_value = 0,
         };
         return evaluator;
     }
@@ -34,7 +36,7 @@ pub const Evaluator = struct {
             try self.evaluate_statement(statement);
         }
 
-        return 0;
+        return self.return_value;
     }
 
     fn evaluate_statement(self: *Evaluator, statement: *parser.Node) !void {
@@ -44,6 +46,7 @@ pub const Evaluator = struct {
         return switch (statement.STATEMENT.statement.*) {
             .VARIABLE_STATEMENT => |*variable_statement| try self.evaluate_variable_statement(@ptrCast(variable_statement)),
             .PRINT_STATEMENT => |*print_statement| try self.evaluate_print_statement(@ptrCast(print_statement)),
+            .RETURN_STATEMENT => |*return_statement| try self.evaluate_return_statement(@ptrCast(return_statement)),
             else => unreachable,
         };
     }
@@ -77,6 +80,16 @@ pub const Evaluator = struct {
         const print_value = try self.get_expression_value(print_statement.PRINT_STATEMENT.expression);
 
         std.debug.print("PRINT: {d}\n", .{print_value});
+    }
+
+    // TODO: This is a functionless implementation of return, we should not do this
+    fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !void {
+        errdefer std.debug.print("Error evaluating return statement\n", .{});
+        std.debug.assert(return_statement.* == parser.Node.RETURN_STATEMENT);
+
+        const return_value = try self.get_expression_value(return_statement.RETURN_STATEMENT.expression);
+
+        self.return_value = return_value;
     }
 
     fn get_expression_value(self: *Evaluator, node: *parser.Node) !i64 {
