@@ -180,7 +180,7 @@ pub const Parser = struct {
             else => unreachable,
         };
 
-        while (self.match_token(tokenizer.TokenType.PLUS)) {
+        if (self.match_token(tokenizer.TokenType.PLUS)) {
             const rhs = try self.parse_expression();
 
             return self.create_node(.{ .EXPRESSION = .{ .BINARY = .{
