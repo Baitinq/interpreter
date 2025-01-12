@@ -51,11 +51,8 @@ fn process_buf(buf: []u8, allocator: std.mem.Allocator, arena: *std.heap.ArenaAl
 
     var source_tokenizer = try tokenizer.Tokenizer.init(buf);
     while (try source_tokenizer.next()) |token| {
-        try token_list.append(token);
-    }
-
-    for (token_list.items) |token| {
         std.debug.print("{any}\n", .{token});
+        try token_list.append(token);
     }
 
     const source_parser = try parser.Parser.init(token_list.items, arena.allocator());

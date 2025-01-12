@@ -1,0 +1,7 @@
+let printOne = () => {
+	print(1);
+};
+
+printOne();
+
+return 0;

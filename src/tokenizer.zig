@@ -9,6 +9,7 @@ pub const TokenType = enum {
     LET,
     PRINT,
     RETURN,
+    ARROW,
 
     // Identifiers
     IDENTIFIER,
@@ -24,12 +25,15 @@ pub const TokenType = enum {
     SEMICOLON,
     LPAREN,
     RPAREN,
+    LBRACE,
+    RBRACE,
 };
 
 pub const Token = union(TokenType) {
     LET: void,
     PRINT: void,
     RETURN: void,
+    ARROW: void,
     IDENTIFIER: []u8,
     NUMBER: i64,
     EQUALS: void,
@@ -37,11 +41,13 @@ pub const Token = union(TokenType) {
     SEMICOLON: void,
     LPAREN: void,
     RPAREN: void,
+    LBRACE: void,
+    RBRACE: void,
 };
 
 pub const Tokenizer = struct {
     buf: []u8,
-    offset: u32,
+    offset: u64,
 
     pub fn init(buf: []u8) !Tokenizer {
         return Tokenizer{ .buf = buf, .offset = 0 };
@@ -55,9 +61,12 @@ pub const Tokenizer = struct {
 
         const c = self.buf[self.offset];
 
+        if (self.accept_substr("=>")) return Token{ .ARROW = void{} };
         if (c == ';') return Token{ .SEMICOLON = void{} };
         if (c == '(') return Token{ .LPAREN = void{} };
         if (c == ')') return Token{ .RPAREN = void{} };
+        if (c == '{') return Token{ .LBRACE = void{} };
+        if (c == '}') return Token{ .RBRACE = void{} };
         if (c == '=') return Token{ .EQUALS = void{} };
         if (c == '+') return Token{ .PLUS = void{} };
 
@@ -94,6 +103,15 @@ pub const Tokenizer = struct {
 
             self.offset += 1;
         }
+    }
+
+    fn accept_substr(self: *Tokenizer, substr: []const u8) bool {
+        if (self.offset + substr.len > self.buf.len) return false;
+        if (std.mem.eql(u8, self.buf[self.offset .. self.offset + substr.len], substr)) {
+            self.offset += substr.len;
+            return true;
+        }
+        return false;
     }
 };
 
