@@ -90,7 +90,8 @@ pub const Evaluator = struct {
                     std.debug.print("Identifier {any} not found\n", .{identifier.name});
                     return EvaluatorError.EvaluationError;
                 };
-                return try self.get_expression_value(expression.?);
+
+                return try self.get_expression_value(expression orelse return EvaluatorError.EvaluationError);
             },
         };
     }
