@@ -6,4 +6,4 @@ VariableStatement ::= ("let" IDENTIFIER | IDENTIFIER) EQUALS Expression
 
 PrintStatement :== PRINT LPAREN Expression RPAREN
 
-Expression :== NUMBER | IDENTIFIER
+Expression :== NUMBER | IDENTIFIER | Expression + Expression

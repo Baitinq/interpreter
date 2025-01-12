@@ -4,6 +4,39 @@ const TokenizerError = error{
     TokenizingError,
 };
 
+pub const TokenType = enum {
+    // Keywords
+    LET,
+    PRINT,
+
+    // Identifiers
+    IDENTIFIER,
+
+    // Literals
+    NUMBER,
+
+    // Operators
+    EQUALS,
+    PLUS,
+
+    // Punctuation
+    SEMICOLON,
+    LPAREN,
+    RPAREN,
+};
+
+pub const Token = union(TokenType) {
+    LET: void,
+    PRINT: void,
+    IDENTIFIER: []u8,
+    NUMBER: i64,
+    EQUALS: void,
+    PLUS: void,
+    SEMICOLON: void,
+    LPAREN: void,
+    RPAREN: void,
+};
+
 pub const Tokenizer = struct {
     buf: []u8,
     offset: u32,
@@ -24,6 +57,7 @@ pub const Tokenizer = struct {
         if (c == '(') return Token{ .LPAREN = void{} };
         if (c == ')') return Token{ .RPAREN = void{} };
         if (c == '=') return Token{ .EQUALS = void{} };
+        if (c == '+') return Token{ .PLUS = void{} };
 
         const string = self.consume_string();
         if (string.len == 0) return TokenizerError.TokenizingError;
@@ -58,37 +92,6 @@ pub const Tokenizer = struct {
             self.offset += 1;
         }
     }
-};
-
-pub const TokenType = enum {
-    // Keywords
-    LET,
-    PRINT,
-
-    // Identifiers
-    IDENTIFIER,
-
-    // Literals
-    NUMBER,
-
-    // Operators
-    EQUALS,
-
-    // Punctuation
-    SEMICOLON,
-    LPAREN,
-    RPAREN,
-};
-
-pub const Token = union(TokenType) {
-    LET: void,
-    PRINT: void,
-    IDENTIFIER: []u8,
-    NUMBER: i64,
-    EQUALS: void,
-    SEMICOLON: void,
-    LPAREN: void,
-    RPAREN: void,
 };
 
 test "simple" {
@@ -132,7 +135,7 @@ test "simple" {
         defer token_list.deinit();
 
         var tokenizer = try Tokenizer.init(t.buf);
-        while (tokenizer.next()) |token| {
+        while (try tokenizer.next()) |token| {
             try token_list.append(token);
         }
         try std.testing.expectEqualDeep(t.tokens, token_list.items);

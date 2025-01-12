@@ -14,24 +14,35 @@ const NodeType = enum {
     EXPRESSION,
 };
 
-pub const Node = union(NodeType) { PROGRAM: struct {
-    statements: []*Node,
-}, STATEMENT: struct {
-    statement: *Node,
-}, VARIABLE_STATEMENT: struct {
-    is_declaration: bool,
-    name: []const u8,
-    expression: *Node,
-}, PRINT_STATEMENT: struct {
-    expression: *Node,
-}, EXPRESSION: union(enum) {
-    NUMBER: struct {
-        value: i64,
+pub const Node = union(NodeType) {
+    PROGRAM: struct {
+        statements: []*Node,
     },
-    IDENTIFIER: struct {
+    STATEMENT: struct {
+        statement: *Node,
+    },
+    VARIABLE_STATEMENT: struct {
+        is_declaration: bool,
         name: []const u8,
+        expression: *Node,
     },
-} };
+    PRINT_STATEMENT: struct {
+        expression: *Node,
+    },
+    EXPRESSION: union(enum) {
+        NUMBER: struct {
+            value: i64,
+        },
+        IDENTIFIER: struct {
+            name: []const u8,
+        },
+        BINARY: struct {
+            //TODO: For now, this just represents sum
+            lhs: *Node,
+            rhs: *Node,
+        },
+    },
+};
 
 pub const Parser = struct {
     tokens: []tokenizer.Token,
@@ -88,12 +99,10 @@ pub const Parser = struct {
     // VariableStatement ::= ("let" IDENTIFIER | IDENTIFIER) EQUALS Expression
     fn parse_variable_statement(self: *Parser) ParserError!*Node {
         errdefer std.debug.print("Error parsing variable statement\n", .{});
-        const token = self.peek_token() orelse return ParserError.ParsingError;
 
         var is_declaration: bool = false;
-        if (token == .LET) {
+        if (self.match_token(.LET)) {
             is_declaration = true;
-            _ = self.consume_token() orelse return ParserError.ParsingError;
         }
 
         const identifier = try self.accept_token(tokenizer.TokenType.IDENTIFIER);
@@ -129,12 +138,12 @@ pub const Parser = struct {
         });
     }
 
-    // Expression :== NUMBER | IDENTIFIER
+    // Expression :== NUMBER | IDENTIFIER | Expression + Expression
     fn parse_expression(self: *Parser) ParserError!*Node {
         errdefer std.debug.print("Error parsing expression\n", .{});
         const token = self.consume_token() orelse return ParserError.ParsingError;
 
-        return switch (token) {
+        const lhs = try switch (token) {
             .NUMBER => |number_token| self.create_node(.{
                 .EXPRESSION = .{
                     .NUMBER = .{
@@ -149,8 +158,19 @@ pub const Parser = struct {
                     },
                 },
             }),
-            else => return ParserError.ParsingError,
+            else => unreachable,
         };
+
+        while (self.match_token(tokenizer.TokenType.PLUS)) {
+            const rhs = try self.parse_expression();
+
+            return self.create_node(.{ .EXPRESSION = .{ .BINARY = .{
+                .lhs = lhs,
+                .rhs = rhs,
+            } } });
+        }
+
+        return lhs;
     }
 
     fn accept_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
@@ -160,6 +180,15 @@ pub const Parser = struct {
         if (token != expected_token) return ParserError.ParsingError;
 
         return self.consume_token() orelse unreachable;
+    }
+
+    fn match_token(self: *Parser, token: tokenizer.TokenType) bool {
+        const curr_token = self.peek_token() orelse return false;
+        if (curr_token == token) {
+            _ = self.consume_token();
+            return true;
+        }
+        return false;
     }
 
     fn consume_token(self: *Parser) ?tokenizer.Token {

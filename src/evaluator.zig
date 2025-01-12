@@ -93,6 +93,12 @@ pub const Evaluator = struct {
 
                 return try self.get_expression_value(expression orelse return EvaluatorError.EvaluationError);
             },
+            .BINARY => |operation| {
+                //TODO: For now, this just represents sum
+                const lhs = try self.get_expression_value(operation.lhs);
+                const rhs = try self.get_expression_value(operation.rhs);
+                return lhs + rhs;
+            },
         };
     }
 };

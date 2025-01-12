@@ -1,5 +1,3 @@
-let ten = 10;
+let sixteen = 10 + 2 + 4;
 
-let twelve = ten + 2;
-
-print(twelve);
+print(sixteen);
