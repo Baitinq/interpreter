@@ -50,7 +50,7 @@ fn process_buf(buf: []u8, allocator: std.mem.Allocator, arena: *std.heap.ArenaAl
     defer token_list.deinit();
 
     var source_tokenizer = try tokenizer.Tokenizer.init(buf);
-    while (source_tokenizer.next()) |token| {
+    while (try source_tokenizer.next()) |token| {
         try token_list.append(token);
     }
 

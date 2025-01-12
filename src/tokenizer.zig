@@ -1,5 +1,9 @@
 const std = @import("std");
 
+const TokenizerError = error{
+    TokenizingError,
+};
+
 pub const Tokenizer = struct {
     buf: []u8,
     offset: u32,
@@ -8,7 +12,7 @@ pub const Tokenizer = struct {
         return Tokenizer{ .buf = buf, .offset = 0 };
     }
 
-    pub fn next(self: *Tokenizer) ?Token {
+    pub fn next(self: *Tokenizer) TokenizerError!?Token {
         defer self.offset += 1;
         self.skip_whitespace();
 
@@ -22,7 +26,7 @@ pub const Tokenizer = struct {
         if (c == '=') return Token{ .EQUALS = void{} };
 
         const string = self.consume_string();
-        self.offset -= 1;
+        if (string.len == 0) return TokenizerError.TokenizingError;
 
         if (std.mem.eql(u8, string, "let")) return Token{ .LET = void{} };
         if (std.mem.eql(u8, string, "print")) return Token{ .PRINT = void{} };
@@ -42,6 +46,7 @@ pub const Tokenizer = struct {
     }
 
     fn consume_string(self: *Tokenizer) []u8 {
+        defer self.offset = if (self.offset > 0) self.offset - 1 else self.offset;
         const start = self.offset;
         while (true) {
             if (self.offset >= self.buf.len) return self.buf[start..self.offset];
