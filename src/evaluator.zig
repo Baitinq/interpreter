@@ -7,14 +7,14 @@ const EvaluatorError = error{
 };
 
 pub const Evaluator = struct {
-    variables: std.StringHashMap(?*parser.Node),
+    variables: std.StringHashMap(?i64),
 
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) !*Evaluator {
         const evaluator = try allocator.create(Evaluator);
         evaluator.* = .{
-            .variables = std.StringHashMap(?*parser.Node).init(allocator),
+            .variables = std.StringHashMap(?i64).init(allocator),
             .allocator = allocator,
         };
         return evaluator;
@@ -60,14 +60,14 @@ pub const Evaluator = struct {
         }
 
         // Make sure identifier exists
-        _ = try self.get_expression_value(node.VARIABLE_STATEMENT.expression);
+        const val = try self.get_expression_value(node.VARIABLE_STATEMENT.expression);
 
         if (!self.variables.contains(variable_statement.name)) {
             std.debug.print("Variable not found: {s}\n", .{variable_statement.name});
             return EvaluatorError.EvaluationError;
         }
 
-        try self.variables.put(variable_statement.name, node.VARIABLE_STATEMENT.expression); //TODO: We really should enforce this at the compiler level.
+        try self.variables.put(variable_statement.name, val);
     }
 
     fn evaluate_print_statement(self: *Evaluator, print_statement: *parser.Node) !void {
@@ -86,12 +86,12 @@ pub const Evaluator = struct {
         return switch (node.EXPRESSION) {
             .NUMBER => |number| number.value,
             .IDENTIFIER => |identifier| {
-                const expression = self.variables.get(identifier.name) orelse {
+                const val = self.variables.get(identifier.name) orelse {
                     std.debug.print("Identifier {any} not found\n", .{identifier.name});
                     return EvaluatorError.EvaluationError;
                 };
 
-                return try self.get_expression_value(expression orelse return EvaluatorError.EvaluationError);
+                return val.?;
             },
             .BINARY => |operation| {
                 //TODO: For now, this just represents sum

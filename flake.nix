@@ -22,6 +22,7 @@
         buildInputs = with pkgs; [
             zig.packages."${system}".master
             zls
+            gdb
         ];
       };
   in {
