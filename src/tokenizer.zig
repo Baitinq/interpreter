@@ -87,7 +87,6 @@ pub const Token = union(TokenType) {
 };
 
 test "simple" {
-    // TODO: Add invalid src test
     const tests = [_]struct {
         buf: []u8,
         tokens: []const Token,

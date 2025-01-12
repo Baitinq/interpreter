@@ -68,6 +68,7 @@ pub const Parser = struct {
 
     // Statement ::= (VariableStatement | PrintStatement) SEMICOLON
     fn parse_statement(self: *Parser) ParserError!*Node {
+        errdefer std.debug.print("Error parsing statement\n", .{});
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
         const statement = switch (token) {
@@ -86,6 +87,7 @@ pub const Parser = struct {
 
     // VariableStatement ::= ("let" IDENTIFIER | IDENTIFIER) EQUALS Expression
     fn parse_variable_statement(self: *Parser) ParserError!*Node {
+        errdefer std.debug.print("Error parsing variable statement\n", .{});
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
         var is_declaration: bool = false;
@@ -111,6 +113,7 @@ pub const Parser = struct {
 
     // PrintStatement :== PRINT LPAREN Expression RPAREN
     fn parse_print_statement(self: *Parser) ParserError!*Node {
+        errdefer std.debug.print("Error parsing print statement\n", .{});
         _ = try self.accept_token(tokenizer.TokenType.PRINT);
 
         _ = try self.accept_token(tokenizer.TokenType.LPAREN);
@@ -128,6 +131,7 @@ pub const Parser = struct {
 
     // Expression :== NUMBER | IDENTIFIER
     fn parse_expression(self: *Parser) ParserError!*Node {
+        errdefer std.debug.print("Error parsing expression\n", .{});
         const token = self.consume_token() orelse return ParserError.ParsingError;
 
         return switch (token) {
@@ -145,11 +149,12 @@ pub const Parser = struct {
                     },
                 },
             }),
-            else => unreachable,
+            else => return ParserError.ParsingError,
         };
     }
 
     fn accept_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
+        errdefer std.debug.print("Error accepting token: {any}\n", .{expected_token});
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
         if (token != expected_token) return ParserError.ParsingError;

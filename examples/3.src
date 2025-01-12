@@ -1,0 +1,5 @@
+let ten = 10;
+
+let twelve = ten + 2;
+
+print(twelve);

@@ -3,6 +3,7 @@ const parser = @import("parser.zig");
 
 const EvaluatorError = error{
     EvaluationError,
+    OutOfMemory,
 };
 
 pub const Evaluator = struct {
@@ -37,6 +38,7 @@ pub const Evaluator = struct {
     }
 
     fn evaluate_statement(self: *Evaluator, statement: *parser.Node) !void {
+        errdefer std.debug.print("Error evaluating statement\n", .{});
         std.debug.assert(statement.* == parser.Node.STATEMENT);
 
         return switch (statement.STATEMENT.statement.*) {
@@ -47,20 +49,29 @@ pub const Evaluator = struct {
     }
 
     fn evaluate_variable_statement(self: *Evaluator, node: *parser.Node) !void {
+        errdefer std.debug.print("Error evaluating variable statement\n", .{});
         std.debug.assert(node.* == parser.Node.VARIABLE_STATEMENT);
 
         const variable_statement = node.VARIABLE_STATEMENT;
 
+        //TODO: We should lowercase keys no?
         if (variable_statement.is_declaration) {
             try self.variables.put(variable_statement.name, null);
         }
 
-        std.debug.assert(self.variables.contains(variable_statement.name));
+        // Make sure identifier exists
+        _ = try self.get_expression_value(node.VARIABLE_STATEMENT.expression);
 
-        try self.variables.put(variable_statement.name, node.VARIABLE_STATEMENT.expression); //TODO: We really should enforce this at the compiler level
+        if (!self.variables.contains(variable_statement.name)) {
+            std.debug.print("Variable not found: {s}\n", .{variable_statement.name});
+            return EvaluatorError.EvaluationError;
+        }
+
+        try self.variables.put(variable_statement.name, node.VARIABLE_STATEMENT.expression); //TODO: We really should enforce this at the compiler level.
     }
 
     fn evaluate_print_statement(self: *Evaluator, print_statement: *parser.Node) !void {
+        errdefer std.debug.print("Error evaluating print statement\n", .{});
         std.debug.assert(print_statement.* == parser.Node.PRINT_STATEMENT);
 
         const print_value = try self.get_expression_value(print_statement.PRINT_STATEMENT.expression);
@@ -69,12 +80,16 @@ pub const Evaluator = struct {
     }
 
     fn get_expression_value(self: *Evaluator, node: *parser.Node) !i64 {
+        errdefer std.debug.print("Error getting statement value\n", .{});
         std.debug.assert(node.* == parser.Node.EXPRESSION);
 
         return switch (node.EXPRESSION) {
             .NUMBER => |number| number.value,
             .IDENTIFIER => |identifier| {
-                const expression = self.variables.get(identifier.name) orelse return EvaluatorError.EvaluationError;
+                const expression = self.variables.get(identifier.name) orelse {
+                    std.debug.print("Identifier {any} not found\n", .{identifier.name});
+                    return EvaluatorError.EvaluationError;
+                };
                 return try self.get_expression_value(expression.?);
             },
         };
