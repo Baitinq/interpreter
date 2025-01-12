@@ -99,7 +99,7 @@ pub const Tokenizer = struct {
 
             const c = self.buf[self.offset];
 
-            if (!std.ascii.isAlphanumeric(c)) return self.buf[start..self.offset];
+            if (!std.ascii.isAlphanumeric(c) and c != '_') return self.buf[start..self.offset];
 
             self.offset += 1;
         }

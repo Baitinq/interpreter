@@ -1,7 +1,7 @@
-let printOne = () => {
+let print_one = () => {
 	print(1);
 };
 
-printOne();
+print_one();
 
 return 0;
