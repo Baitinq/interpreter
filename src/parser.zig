@@ -9,10 +9,14 @@ const ParserError = error{
 const NodeType = enum {
     PROGRAM,
     STATEMENT,
-    VARIABLE_STATEMENT,
+    ASSIGNMENT_STATEMENT,
     PRINT_STATEMENT,
-    RETURN_STATEMENT,
+    FUNCTION_CALL_STATEMENT,
     EXPRESSION,
+    ADDITIVE_EXPRESSION,
+    PRIMARY_EXPRESSION,
+    FUNCTION_DEFINITION,
+    RETURN_STATEMENT,
 };
 
 pub const Node = union(NodeType) {
@@ -22,7 +26,7 @@ pub const Node = union(NodeType) {
     STATEMENT: struct {
         statement: *Node,
     },
-    VARIABLE_STATEMENT: struct {
+    ASSIGNMENT_STATEMENT: struct {
         is_declaration: bool,
         name: []const u8,
         expression: *Node,
@@ -30,21 +34,37 @@ pub const Node = union(NodeType) {
     PRINT_STATEMENT: struct {
         expression: *Node,
     },
-    RETURN_STATEMENT: struct {
-        expression: *Node,
+    FUNCTION_CALL_STATEMENT: struct {
+        name: []const u8,
     },
-    EXPRESSION: union(enum) {
+    EXPRESSION: struct {
+        ADDITIVE_EXPRESSION: struct {
+            expression: *Node,
+        },
+        FUNCTION_DEFINITION: struct {
+            expression: *Node,
+        },
+    },
+    ADDITIVE_EXPRESSION: struct {
+        lhs: *Node,
+        rhs: *Node,
+    },
+    PRIMARY_EXPRESSION: union(enum) {
         NUMBER: struct {
             value: i64,
         },
         IDENTIFIER: struct {
             name: []const u8,
         },
-        BINARY: struct {
-            //TODO: For now, this just represents sum
-            lhs: *Node,
-            rhs: *Node,
+        FUNCTION_CALL: struct {
+            name: []const u8,
         },
+    },
+    FUNCTION_DEFINITION: struct {
+        statements: []*Node,
+    },
+    RETURN_STATEMENT: struct {
+        expression: *Node,
     },
 };
 
@@ -54,12 +74,15 @@ pub const Parser = struct {
 
     allocator: std.mem.Allocator,
 
-    pub fn init(tokens: []tokenizer.Token, allocator: std.mem.Allocator) ParserError!*Parser {
-        const parser = try allocator.create(Parser);
+    try_context: bool, //TODO: I dont like this
+
+    pub fn init(tokens: []tokenizer.Token, arena_allocator: *std.heap.ArenaAllocator) ParserError!*Parser {
+        const parser = try arena_allocator.allocator().create(Parser);
         parser.* = .{
             .tokens = tokens,
             .offset = 0,
-            .allocator = allocator,
+            .allocator = arena_allocator.allocator(),
+            .try_context = false,
         };
         return parser;
     }
@@ -71,7 +94,6 @@ pub const Parser = struct {
     // Program ::= Statement+
     fn parse_program(self: *Parser) !*Node {
         var nodes = std.ArrayList(*Node).init(self.allocator);
-        defer nodes.deinit();
         while (self.offset < self.tokens.len) {
             try nodes.append(@constCast(try self.parse_statement()));
         }
@@ -81,29 +103,30 @@ pub const Parser = struct {
         } });
     }
 
-    // Statement ::= (VariableStatement | PrintStatement) SEMICOLON
+    // Statement ::= (AssignmentStatement | PrintStatement | FunctionCallStatement) SEMICOLON
     fn parse_statement(self: *Parser) ParserError!*Node {
-        errdefer std.debug.print("Error parsing statement\n", .{});
-        const token = self.peek_token() orelse return ParserError.ParsingError;
+        errdefer if (!self.try_context) std.debug.print("Error parsing statement\n", .{});
 
-        const statement = switch (token) {
-            .PRINT => try self.parse_print_statement(),
-            .RETURN => try self.parse_return_statement(),
-            else => try self.parse_variable_statement(),
-        };
-
+        var statement: ?*Node = undefined;
+        if (self.accept_parse(parse_print_statement)) |stmt| {
+            statement = stmt;
+        } else if (self.accept_parse(parse_function_call_statement)) |stmt| {
+            statement = stmt;
+        } else {
+            statement = try self.parse_assignment_statement();
+        }
         _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
 
         return self.create_node(.{
             .STATEMENT = .{
-                .statement = statement,
+                .statement = statement.?,
             },
         });
     }
 
-    // VariableStatement ::= ("let" IDENTIFIER | IDENTIFIER) EQUALS Expression
-    fn parse_variable_statement(self: *Parser) ParserError!*Node {
-        errdefer std.debug.print("Error parsing variable statement\n", .{});
+    // AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
+    fn parse_assignment_statement(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing assignment statement\n", .{});
 
         var is_declaration: bool = false;
         if (self.match_token(.LET)) {
@@ -117,7 +140,7 @@ pub const Parser = struct {
         const expression = try self.parse_expression();
 
         return self.create_node(.{
-            .VARIABLE_STATEMENT = .{
+            .ASSIGNMENT_STATEMENT = .{
                 .is_declaration = is_declaration,
                 .name = try self.allocator.dupe(u8, identifier.IDENTIFIER),
                 .expression = @constCast(expression),
@@ -127,7 +150,7 @@ pub const Parser = struct {
 
     // PrintStatement :== PRINT LPAREN Expression RPAREN
     fn parse_print_statement(self: *Parser) ParserError!*Node {
-        errdefer std.debug.print("Error parsing print statement\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing print statement\n", .{});
         _ = try self.accept_token(tokenizer.TokenType.PRINT);
 
         _ = try self.accept_token(tokenizer.TokenType.LPAREN);
@@ -143,12 +166,106 @@ pub const Parser = struct {
         });
     }
 
+    // FunctionCallStatement ::= IDENTIFIER LPAREN RPAREN
+    fn parse_function_call_statement(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing function call statement\n", .{});
+
+        const identifier = try self.accept_token(tokenizer.TokenType.IDENTIFIER);
+
+        _ = try self.accept_token(tokenizer.TokenType.LPAREN);
+        _ = try self.accept_token(tokenizer.TokenType.RPAREN);
+
+        return self.create_node(.{ .FUNCTION_CALL_STATEMENT = .{ .name = try self.allocator.dupe(u8, identifier.IDENTIFIER) } });
+    }
+
+    // Expression   ::= AdditiveExpression | FunctionDefinition
+    fn parse_expression(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing expression\n", .{});
+
+        if (self.accept_parse(parse_additive_expression)) |expression| {
+            return expression;
+        } else if (self.accept_parse(parse_function_definition)) |expression| {
+            return expression;
+        }
+
+        return ParserError.ParsingError;
+    }
+
+    // AdditiveExpression ::= PrimaryExpression ("+" AdditiveExpression)
+    fn parse_additive_expression(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
+
+        const lhs = try self.parse_primary_expression();
+
+        if (self.match_token(tokenizer.TokenType.PLUS)) {
+            const rhs = try self.parse_additive_expression();
+            return self.create_node(.{ .ADDITIVE_EXPRESSION = .{
+                .lhs = lhs,
+                .rhs = rhs,
+            } });
+        }
+
+        return lhs;
+    }
+
+    // PrimaryExpression ::= NUMBER | IDENTIFIER | FunctionCallStatement
+    fn parse_primary_expression(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing primary expression\n", .{});
+
+        const token = self.consume_token() orelse return ParserError.ParsingError;
+
+        if (self.accept_parse(parse_function_call_statement)) |stmt| return stmt;
+
+        return switch (token) {
+            .NUMBER => |number_token| try self.create_node(.{
+                .PRIMARY_EXPRESSION = .{
+                    .NUMBER = .{
+                        .value = number_token,
+                    },
+                },
+            }),
+            .IDENTIFIER => |identifier_token| try self.create_node(.{
+                .PRIMARY_EXPRESSION = .{
+                    .IDENTIFIER = .{
+                        .name = try self.allocator.dupe(u8, identifier_token),
+                    },
+                },
+            }),
+            else => ParserError.ParsingError,
+        };
+    }
+
+    // FunctionDefinition ::= ARROW LBRACE Statement* ReturnStatement RBRACE
+    fn parse_function_definition(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing function definition\n", .{});
+
+        _ = try self.accept_token(tokenizer.TokenType.LPAREN);
+        _ = try self.accept_token(tokenizer.TokenType.RPAREN);
+        _ = try self.accept_token(tokenizer.TokenType.ARROW);
+        _ = try self.accept_token(tokenizer.TokenType.LBRACE);
+
+        var nodes = std.ArrayList(*Node).init(self.allocator);
+        while (self.accept_parse(parse_statement)) |expression| {
+            try nodes.append(expression);
+        }
+
+        try nodes.append(try self.parse_return_statement());
+
+        _ = try self.accept_token(tokenizer.TokenType.RBRACE);
+
+        return self.create_node(.{ .FUNCTION_DEFINITION = .{
+            .statements = nodes.items,
+        } });
+    }
+
     // ReturnStatement :== RETURN Expression
     fn parse_return_statement(self: *Parser) ParserError!*Node {
-        errdefer std.debug.print("Error parsing return statement\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing return statement\n", .{});
         _ = try self.accept_token(tokenizer.TokenType.RETURN);
 
         const expression = try self.parse_expression();
+
+        _ = try self.accept_token(tokenizer.TokenType.SEMICOLON); //TODO: I dont like this
 
         return self.create_node(.{
             .RETURN_STATEMENT = .{
@@ -157,46 +274,25 @@ pub const Parser = struct {
         });
     }
 
-    // Expression :== NUMBER | IDENTIFIER | Expression + Expression
-    fn parse_expression(self: *Parser) ParserError!*Node {
-        errdefer std.debug.print("Error parsing expression\n", .{});
-        const token = self.consume_token() orelse return ParserError.ParsingError;
-
-        const lhs = try switch (token) {
-            .NUMBER => |number_token| self.create_node(.{
-                .EXPRESSION = .{
-                    .NUMBER = .{
-                        .value = number_token,
-                    },
-                },
-            }),
-            .IDENTIFIER => |identifier_token| self.create_node(.{
-                .EXPRESSION = .{
-                    .IDENTIFIER = .{
-                        .name = try self.allocator.dupe(u8, identifier_token),
-                    },
-                },
-            }),
-            else => unreachable,
+    fn accept_parse(self: *Parser, parsing_func: *const fn (_: *Parser) ParserError!*Node) ?*Node {
+        const prev_offset = self.offset;
+        self.try_context = true;
+        defer self.try_context = false;
+        const node = parsing_func(self) catch {
+            self.offset = prev_offset;
+            return null;
         };
-
-        if (self.match_token(tokenizer.TokenType.PLUS)) {
-            const rhs = try self.parse_expression();
-
-            return self.create_node(.{ .EXPRESSION = .{ .BINARY = .{
-                .lhs = lhs,
-                .rhs = rhs,
-            } } });
-        }
-
-        return lhs;
+        return node;
     }
 
     fn accept_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
-        errdefer std.debug.print("Error accepting token: {any}\n", .{expected_token});
+        errdefer if (!self.try_context) std.debug.print("Error accepting token: {any}\n", .{expected_token});
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
-        if (token != expected_token) return ParserError.ParsingError;
+        if (token != expected_token) {
+            if (!self.try_context) std.debug.print("Expected {any} - found {any}\n", .{ expected_token, token });
+            return ParserError.ParsingError;
+        }
 
         return self.consume_token() orelse unreachable;
     }
@@ -296,7 +392,7 @@ test "simple e2e" {
     defer arena.deinit();
     var parser = try Parser.init(tokens, arena.allocator());
     const ast = try parser.parse();
-    const expected_ast = Node{ .PROGRAM = .{ .statements = @constCast(&[_]*Node{@constCast(&Node{ .STATEMENT = .{ .statement = @constCast(&Node{ .VARIABLE_STATEMENT = .{
+    const expected_ast = Node{ .PROGRAM = .{ .statements = @constCast(&[_]*Node{@constCast(&Node{ .STATEMENT = .{ .statement = @constCast(&Node{ .ASSIGNMENT_STATEMENT = .{
         .is_declaration = true,
         .name = @constCast("i"),
         .expression = @constCast(&Node{ .EXPRESSION = .{

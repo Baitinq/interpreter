@@ -1,11 +1,19 @@
-Program ::= Statement+
+Program      ::= Statement+
 
-Statement ::= (VariableStatement | PrintStatement | ReturnStatement) SEMICOLON
+Statement    ::= (AssignmentStatement | PrintStatement | FunctionCallStatement) SEMICOLON
 
-VariableStatement ::= ("let" IDENTIFIER | IDENTIFIER) EQUALS Expression
+AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
 
-PrintStatement :== PRINT LPAREN Expression RPAREN
+PrintStatement ::= PRINT LPAREN Expression RPAREN -- TODO: this won't be needed once functions support arguments
 
-ReturnStatement :== RETURN Expression
+FunctionCallStatement ::= IDENTIFIER LPAREN RPAREN
 
-Expression :== NUMBER | IDENTIFIER | Expression + Expression
+Expression   ::= AdditiveExpression | FunctionDefinition
+
+AdditiveExpression ::= PrimaryExpression ("+" AdditiveExpression)
+
+PrimaryExpression ::= NUMBER | IDENTIFIER | FunctionCallStatement
+
+FunctionDefinition ::= ARROW LBRACE Statement* ReturnStatement RBRACE
+
+ReturnStatement ::= RETURN Expression SEMICOLON --TODO: I dont like this
