@@ -1,6 +1,8 @@
 let print_one = () => {
 	print(1);
-	return 1;
+	return 0;
 };
 
-print_one();
+let y = print_one();
+
+print(y);

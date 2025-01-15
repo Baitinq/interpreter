@@ -88,7 +88,7 @@ pub const Parser = struct {
     }
 
     pub fn parse(self: *Parser) !*Node {
-        return self.parse_program();
+        return try self.parse_program();
     }
 
     // Program ::= Statement+
@@ -107,19 +107,16 @@ pub const Parser = struct {
     fn parse_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing statement\n", .{});
 
-        var statement: ?*Node = undefined;
-        if (self.accept_parse(parse_print_statement)) |stmt| {
-            statement = stmt;
-        } else if (self.accept_parse(parse_function_call_statement)) |stmt| {
-            statement = stmt;
-        } else {
-            statement = try self.parse_assignment_statement();
-        }
+        const statement =
+            self.accept_parse(parse_print_statement) orelse
+            self.accept_parse(parse_function_call_statement) orelse
+            try self.parse_assignment_statement();
+
         _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
 
         return self.create_node(.{
             .STATEMENT = .{
-                .statement = statement.?,
+                .statement = statement,
             },
         });
     }
@@ -182,13 +179,9 @@ pub const Parser = struct {
     fn parse_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing expression\n", .{});
 
-        if (self.accept_parse(parse_additive_expression)) |expression| {
-            return expression;
-        } else if (self.accept_parse(parse_function_definition)) |expression| {
-            return expression;
-        }
-
-        return ParserError.ParsingError;
+        return self.accept_parse(parse_additive_expression) orelse
+            self.accept_parse(parse_function_definition) orelse
+            return ParserError.ParsingError;
     }
 
     // AdditiveExpression ::= PrimaryExpression ("+" AdditiveExpression)
@@ -212,9 +205,9 @@ pub const Parser = struct {
     fn parse_primary_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing primary expression\n", .{});
 
-        const token = self.consume_token() orelse return ParserError.ParsingError;
-
         if (self.accept_parse(parse_function_call_statement)) |stmt| return stmt;
+
+        const token = self.consume_token() orelse return ParserError.ParsingError;
 
         return switch (token) {
             .NUMBER => |number_token| try self.create_node(.{
@@ -277,11 +270,11 @@ pub const Parser = struct {
     fn accept_parse(self: *Parser, parsing_func: *const fn (_: *Parser) ParserError!*Node) ?*Node {
         const prev_offset = self.offset;
         self.try_context = true;
-        defer self.try_context = false;
         const node = parsing_func(self) catch {
             self.offset = prev_offset;
             return null;
         };
+        self.try_context = false;
         return node;
     }
 
