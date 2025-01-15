@@ -37,7 +37,7 @@ pub const Node = union(NodeType) {
     FUNCTION_CALL_STATEMENT: struct {
         name: []const u8,
     },
-    EXPRESSION: struct {
+    EXPRESSION: union(enum) {
         ADDITIVE_EXPRESSION: struct {
             expression: *Node,
         },

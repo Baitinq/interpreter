@@ -3,6 +3,11 @@ let print_one = () => {
 	return 0;
 };
 
-let y = print_one();
 
-print(y);
+let main = () => {
+	let y = print_one();
+
+	print(y);
+
+	return y;
+};
