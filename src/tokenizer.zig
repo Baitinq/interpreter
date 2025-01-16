@@ -55,6 +55,7 @@ pub const Tokenizer = struct {
 
     pub fn next(self: *Tokenizer) TokenizerError!?Token {
         defer self.offset += 1;
+        self.skip_comments();
         self.skip_whitespace();
 
         if (self.offset >= self.buf.len) return null;
@@ -80,6 +81,14 @@ pub const Tokenizer = struct {
         if (std.fmt.parseInt(i32, string, 10) catch null) |i| return Token{ .NUMBER = i };
 
         return Token{ .IDENTIFIER = string };
+    }
+
+    fn skip_comments(self: *Tokenizer) void {
+        if (!self.accept_substr("/*")) return;
+
+        while (!self.accept_substr("*/")) {
+            self.offset += 1;
+        }
     }
 
     fn skip_whitespace(self: *Tokenizer) void {
