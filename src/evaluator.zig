@@ -7,14 +7,16 @@ const EvaluatorError = error{
 };
 
 pub const Evaluator = struct {
-    variables: std.StringHashMap(?*parser.Node), //TODO: Reference vs value
+    ast: ?*parser.Node,
+    variables: std.StringHashMap(?i64),
 
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) !*Evaluator {
         const evaluator = try allocator.create(Evaluator);
         evaluator.* = .{
-            .variables = std.StringHashMap(?*parser.Node).init(allocator),
+            .ast = null,
+            .variables = std.StringHashMap(?i64).init(allocator),
             .allocator = allocator,
         };
         return evaluator;
@@ -29,7 +31,9 @@ pub const Evaluator = struct {
         errdefer std.debug.print("Error evaluating AST\n", .{});
         std.debug.assert(ast.* == parser.Node.PROGRAM);
 
-        const main = find_main(ast) orelse return EvaluatorError.EvaluationError;
+        self.ast = ast;
+
+        const main = self.find_function("main") orelse return EvaluatorError.EvaluationError;
         return try self.evaluate_function_definition(main);
     }
 
@@ -61,7 +65,9 @@ pub const Evaluator = struct {
             return EvaluatorError.EvaluationError;
         }
 
-        try self.variables.put(assignment_statement.name, assignment_statement.expression);
+        const val = try self.get_expression_value(assignment_statement.expression);
+
+        try self.variables.put(assignment_statement.name, val);
     }
 
     fn evaluate_print_statement(self: *Evaluator, print_statement: *parser.Node) !void {
@@ -77,9 +83,9 @@ pub const Evaluator = struct {
         errdefer std.debug.print("Error evaluating function call statement\n", .{});
         std.debug.assert(function_call_statement.* == parser.Node.FUNCTION_CALL_STATEMENT);
 
-        const node = self.variables.get(function_call_statement.FUNCTION_CALL_STATEMENT.name) orelse return EvaluatorError.EvaluationError;
+        const val = self.variables.get(function_call_statement.FUNCTION_CALL_STATEMENT.name) orelse return EvaluatorError.EvaluationError;
 
-        return try self.evaluate_function_definition(node.?);
+        return val.?;
     }
 
     fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !i64 {
@@ -109,17 +115,22 @@ pub const Evaluator = struct {
                             return EvaluatorError.EvaluationError;
                         };
 
-                        return self.get_expression_value(val.?);
+                        return val.?;
                     },
                     else => unreachable,
                 }
+            },
+            .FUNCTION_CALL_STATEMENT => |x| {
+                const func = self.find_function(x.name) orelse return EvaluatorError.EvaluationError;
+
+                return try self.evaluate_function_definition(func);
             },
 
             else => unreachable,
         }
     }
 
-    fn evaluate_function_definition(self: *Evaluator, node: *parser.Node) !i64 {
+    fn evaluate_function_definition(self: *Evaluator, node: *parser.Node) EvaluatorError!i64 {
         errdefer std.debug.print("Error evaluating function definition\n", .{});
         std.debug.assert(node.* == parser.Node.FUNCTION_DEFINITION);
 
@@ -136,15 +147,15 @@ pub const Evaluator = struct {
         return try self.evaluate_return_statement(return_stmt);
     }
 
-    fn find_main(ast: *parser.Node) ?*parser.Node {
+    fn find_function(self: *Evaluator, name: []const u8) ?*parser.Node {
         errdefer std.debug.print("Error finding main function\n", .{});
-        std.debug.assert(ast.* == parser.Node.PROGRAM);
+        std.debug.assert(self.ast.?.* == parser.Node.PROGRAM);
 
-        for (ast.PROGRAM.statements) |*statement| {
+        for (self.ast.?.PROGRAM.statements) |*statement| {
             const x = statement.*.STATEMENT.statement;
             if (x.* != parser.Node.ASSIGNMENT_STATEMENT) continue;
             const y = x.*.ASSIGNMENT_STATEMENT;
-            if (y.is_declaration and std.mem.eql(u8, y.name, "main")) {
+            if (y.is_declaration and std.mem.eql(u8, y.name, name)) {
                 return y.expression;
             }
         }

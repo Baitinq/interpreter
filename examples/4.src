@@ -1,11 +1,11 @@
 let print_one = () => {
 	print(1);
-	return 0;
+	return 4;
 };
 
 
 let main = () => {
-	let y = print_one();
+	let y = print_one() + 2;
 
 	print(y);
 
