@@ -1,1 +1,5 @@
-print(2);
+let main = () => {
+	print(2);
+	
+	return 1;
+};

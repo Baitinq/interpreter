@@ -26,15 +26,11 @@ pub const Evaluator = struct {
     }
 
     pub fn evaluate_ast(self: *Evaluator, ast: *parser.Node) !i64 {
+        errdefer std.debug.print("Error evaluating AST\n", .{});
         std.debug.assert(ast.* == parser.Node.PROGRAM);
 
         const main = find_main(ast) orelse return EvaluatorError.EvaluationError;
-
-        for (main.*.FUNCTION_DEFINITION.statements) |statement| {
-            try self.evaluate_statement(statement);
-        }
-
-        return 0; //TODO: Return value
+        return try self.evaluate_function_definition(main);
     }
 
     fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!void {
@@ -44,7 +40,7 @@ pub const Evaluator = struct {
         return switch (statement.STATEMENT.statement.*) {
             .ASSIGNMENT_STATEMENT => |*assignment_statement| try self.evaluate_assignment_statement(@ptrCast(assignment_statement)),
             .PRINT_STATEMENT => |*print_statement| try self.evaluate_print_statement(@ptrCast(print_statement)),
-            .FUNCTION_CALL_STATEMENT => |*function_call_statement| try self.evaluate_function_call_statement(@ptrCast(function_call_statement)),
+            .FUNCTION_CALL_STATEMENT => |*function_call_statement| _ = try self.evaluate_function_call_statement(@ptrCast(function_call_statement)),
             else => unreachable,
         };
     }
@@ -77,63 +73,71 @@ pub const Evaluator = struct {
         std.debug.print("PRINT: {d}\n", .{print_value});
     }
 
-    fn evaluate_function_call_statement(self: *Evaluator, function_call_statement: *parser.Node) !void {
+    fn evaluate_function_call_statement(self: *Evaluator, function_call_statement: *parser.Node) !i64 {
         errdefer std.debug.print("Error evaluating function call statement\n", .{});
         std.debug.assert(function_call_statement.* == parser.Node.FUNCTION_CALL_STATEMENT);
 
         const node = self.variables.get(function_call_statement.FUNCTION_CALL_STATEMENT.name) orelse return EvaluatorError.EvaluationError;
 
-        const x = node.?.FUNCTION_DEFINITION;
-
-        for (x.statements) |stmt| {
-            try self.evaluate_statement(stmt); //TODO: Return stmt?
-        }
+        return try self.evaluate_function_definition(node.?);
     }
 
-    // TODO: This is a functionless implementation of return, we should not do this
-    fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !void {
+    fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !i64 {
         errdefer std.debug.print("Error evaluating return statement\n", .{});
         std.debug.assert(return_statement.* == parser.Node.RETURN_STATEMENT);
 
         const return_value = try self.get_expression_value(return_statement.RETURN_STATEMENT.expression);
 
-        self.return_value = return_value;
+        return return_value;
     }
 
     fn get_expression_value(self: *Evaluator, node: *parser.Node) !i64 {
         errdefer std.debug.print("Error getting statement value\n", .{});
-        std.debug.assert(node.* == parser.Node.EXPRESSION);
 
-        switch (node.EXPRESSION) {
-            .ADDITIVE_EXPRESSION => |additive_expression| {
-                switch (additive_expression.expression.*) {
-                    .ADDITIVE_EXPRESSION => |x| {
-                        const lhs = try self.get_expression_value(x.lhs);
-                        const rhs = try self.get_expression_value(x.rhs);
-                        return lhs + rhs;
-                    },
-                    .PRIMARY_EXPRESSION => |x| {
-                        switch (x) {
-                            .NUMBER => |number| return number.value,
-                            .IDENTIFIER => |identifier| {
-                                const val = self.variables.get(identifier.name) orelse {
-                                    std.debug.print("Identifier {any} not found\n", .{identifier.name});
-                                    return EvaluatorError.EvaluationError;
-                                };
+        switch (node.*) {
+            .ADDITIVE_EXPRESSION => |x| {
+                const lhs = try self.get_expression_value(x.lhs);
+                const rhs = try self.get_expression_value(x.rhs);
+                return lhs + rhs;
+            },
+            .PRIMARY_EXPRESSION => |x| {
+                switch (x) {
+                    .NUMBER => |number| return number.value,
+                    .IDENTIFIER => |identifier| {
+                        const val = self.variables.get(identifier.name) orelse {
+                            std.debug.print("Identifier {any} not found\n", .{identifier.name});
+                            return EvaluatorError.EvaluationError;
+                        };
 
-                                return self.get_expression_value(val.?);
-                            },
-                            else => unreachable,
-                        }
+                        return self.get_expression_value(val.?);
                     },
                     else => unreachable,
                 }
             },
+
             else => unreachable,
         }
     }
 
+    fn evaluate_function_definition(self: *Evaluator, node: *parser.Node) !i64 {
+        errdefer std.debug.print("Error evaluating function definition\n", .{});
+        std.debug.assert(node.* == parser.Node.FUNCTION_DEFINITION);
+
+        const function_definition = node.*.FUNCTION_DEFINITION;
+
+        var i: usize = 0;
+        while (i < function_definition.statements.len - 1) {
+            const stmt = function_definition.statements[i];
+            try self.evaluate_statement(stmt);
+            i += 1;
+        }
+
+        const return_stmt = function_definition.statements[i];
+        return try self.evaluate_return_statement(return_stmt);
+    }
+
     fn find_main(ast: *parser.Node) ?*parser.Node {
+        errdefer std.debug.print("Error finding main function\n", .{});
         std.debug.assert(ast.* == parser.Node.PROGRAM);
 
         for (ast.PROGRAM.statements) |*statement| {

@@ -1,3 +1,7 @@
-let i = 4;
+let main = () => {
+	let i = 4;
 
-print(i);
+	print(i);
+
+	return 0;
+};

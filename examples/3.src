@@ -1,5 +1,9 @@
-let seventeen = 10 + 2 + 4;
+let main = () => {
+	let seventeen = 10 + 2 + 4;
 
-seventeen = seventeen + 1;
+	seventeen = seventeen + 1;
 
-print(seventeen);
+	print(seventeen);
+
+	return seventeen;
+};

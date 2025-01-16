@@ -1,5 +1,9 @@
-let test = 1922;
+let main = () => {
+	let test = 1922;
 
-test = 7;
+	test = 7;
 
-print(test);
+	print(test);
+
+	return test;
+};
