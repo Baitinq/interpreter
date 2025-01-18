@@ -152,6 +152,9 @@ pub const Evaluator = struct {
 
         const function_definition = node.*.FUNCTION_DEFINITION;
 
+        try self.environment.create_scope();
+        defer self.environment.drop_scope();
+
         var i: usize = 0;
         while (i < function_definition.statements.len - 1) {
             const stmt = function_definition.statements[i];
@@ -196,14 +199,16 @@ const Environment = struct {
     }
 
     fn create_scope(self: *Environment) !void {
-        const global_scope = try self.allocator.create(Scope);
-        global_scope.* = .{
+        const scope = try self.allocator.create(Scope);
+        scope.* = .{
             .variables = std.StringHashMap(?*Variable).init(self.allocator),
         };
-        try self.scope_stack.append(global_scope);
+        try self.scope_stack.append(scope);
     }
 
-    fn drop_scope() !void {}
+    fn drop_scope(self: *Environment) void {
+        _ = self.scope_stack.pop();
+    }
 
     fn add_variable(self: *Environment, name: []const u8, variable: ?*Variable) !void {
         try self.scope_stack.getLast().variables.put(name, variable);
