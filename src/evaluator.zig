@@ -9,6 +9,7 @@ const EvaluatorError = error{
 pub const Evaluator = struct {
     ast: ?*parser.Node,
     variables: std.StringHashMap(?i64),
+    //TODO: CREATE STACK WITH SCOPES AND WE CAN SEARCH UP SCOPES
 
     allocator: std.mem.Allocator,
 

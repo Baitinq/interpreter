@@ -36,6 +36,7 @@ pub const Node = union(NodeType) {
     },
     FUNCTION_CALL_STATEMENT: struct {
         name: []const u8,
+        arguments: []*Node,
     },
     EXPRESSION: union(enum) {
         ADDITIVE_EXPRESSION: struct {
@@ -62,6 +63,7 @@ pub const Node = union(NodeType) {
     },
     FUNCTION_DEFINITION: struct {
         statements: []*Node,
+        parameters: []*Node,
     },
     RETURN_STATEMENT: struct {
         expression: *Node,
@@ -126,7 +128,7 @@ pub const Parser = struct {
         errdefer if (!self.try_context) std.debug.print("Error parsing assignment statement\n", .{});
 
         var is_declaration: bool = false;
-        if (self.match_token(.LET)) {
+        if (self.match_token(.LET) != null) {
             is_declaration = true;
         }
 
@@ -163,16 +165,39 @@ pub const Parser = struct {
         });
     }
 
-    // FunctionCallStatement ::= IDENTIFIER LPAREN RPAREN
+    // FunctionCallStatement ::= IDENTIFIER LPAREN FunctionArguments? RPAREN
     fn parse_function_call_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function call statement\n", .{});
 
         const identifier = try self.accept_token(tokenizer.TokenType.IDENTIFIER);
 
         _ = try self.accept_token(tokenizer.TokenType.LPAREN);
+
+        const arguments = try self.parse_function_arguments();
+
         _ = try self.accept_token(tokenizer.TokenType.RPAREN);
 
-        return self.create_node(.{ .FUNCTION_CALL_STATEMENT = .{ .name = try self.allocator.dupe(u8, identifier.IDENTIFIER) } });
+        return self.create_node(.{ .FUNCTION_CALL_STATEMENT = .{
+            .name = try self.allocator.dupe(u8, identifier.IDENTIFIER),
+            .arguments = arguments,
+        } });
+    }
+
+    // FunctionArguments ::= Expression ("," Expression)*
+    fn parse_function_arguments(self: *Parser) ParserError![]*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing function arguments\n", .{});
+        var nodeList = std.ArrayList(*Node).init(self.allocator);
+
+        var first = true;
+        while (self.accept_parse(parse_expression)) |a| {
+            if (!first) {
+                _ = try self.accept_token(tokenizer.TokenType.COMMA);
+            }
+            first = false;
+            try nodeList.append(a);
+        }
+
+        return nodeList.items;
     }
 
     // Expression   ::= AdditiveExpression | FunctionDefinition
@@ -190,7 +215,7 @@ pub const Parser = struct {
 
         const lhs = try self.parse_primary_expression();
 
-        if (self.match_token(tokenizer.TokenType.PLUS)) {
+        if (self.match_token(tokenizer.TokenType.PLUS) != null) {
             const rhs = try self.parse_additive_expression();
             return self.create_node(.{ .ADDITIVE_EXPRESSION = .{
                 .lhs = lhs,
@@ -228,12 +253,16 @@ pub const Parser = struct {
         };
     }
 
-    // FunctionDefinition ::= ARROW LBRACE Statement* ReturnStatement RBRACE
+    // FunctionDefinition ::= LPAREN FunctionParamters? RPAREN ARROW LBRACE Statement* ReturnStatement RBRACE
     fn parse_function_definition(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function definition\n", .{});
 
         _ = try self.accept_token(tokenizer.TokenType.LPAREN);
+
+        const parameters = try self.parse_function_parameters();
+
         _ = try self.accept_token(tokenizer.TokenType.RPAREN);
+
         _ = try self.accept_token(tokenizer.TokenType.ARROW);
         _ = try self.accept_token(tokenizer.TokenType.LBRACE);
 
@@ -248,7 +277,32 @@ pub const Parser = struct {
 
         return self.create_node(.{ .FUNCTION_DEFINITION = .{
             .statements = nodes.items,
+            .parameters = parameters,
         } });
+    }
+
+    // FunctionParameters ::= IDENTIFIER ("," IDENTIFIER)*
+    fn parse_function_parameters(self: *Parser) ParserError![]*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing function parameters\n", .{});
+        var nodeList = std.ArrayList(*Node).init(self.allocator);
+
+        var first = true;
+        while (self.match_token(tokenizer.TokenType.IDENTIFIER)) |a| {
+            if (!first) {
+                _ = try self.accept_token(tokenizer.TokenType.COMMA);
+            }
+            first = false;
+
+            try nodeList.append(try self.create_node(.{
+                .PRIMARY_EXPRESSION = .{
+                    .IDENTIFIER = .{
+                        .name = try self.allocator.dupe(u8, a.IDENTIFIER),
+                    },
+                },
+            }));
+        }
+
+        return nodeList.items;
     }
 
     // ReturnStatement :== RETURN Expression
@@ -290,13 +344,12 @@ pub const Parser = struct {
         return self.consume_token() orelse unreachable;
     }
 
-    fn match_token(self: *Parser, token: tokenizer.TokenType) bool {
-        const curr_token = self.peek_token() orelse return false;
+    fn match_token(self: *Parser, token: tokenizer.TokenType) ?tokenizer.Token {
+        const curr_token = self.peek_token() orelse return null;
         if (curr_token == token) {
-            _ = self.consume_token();
-            return true;
+            return self.consume_token();
         }
-        return false;
+        return null;
     }
 
     fn consume_token(self: *Parser) ?tokenizer.Token {

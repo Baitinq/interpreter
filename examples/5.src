@@ -3,7 +3,6 @@ let print_input = (input) => {
 	return input;
 };
 
-
 let main = () => {
 	return print_input(7);
 };

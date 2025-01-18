@@ -6,7 +6,9 @@ AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
 
 PrintStatement ::= PRINT LPAREN Expression RPAREN -- TODO: this won't be needed once functions support arguments
 
-FunctionCallStatement ::= IDENTIFIER LPAREN RPAREN
+FunctionCallStatement ::= IDENTIFIER LPAREN FunctionArguments? RPAREN
+
+FunctionArguments ::= Expression ("," Expression)*
 
 Expression   ::= AdditiveExpression | FunctionDefinition
 
@@ -14,6 +16,8 @@ AdditiveExpression ::= PrimaryExpression ("+" AdditiveExpression)
 
 PrimaryExpression ::= NUMBER | IDENTIFIER | FunctionCallStatement
 
-FunctionDefinition ::= ARROW LBRACE Statement* ReturnStatement RBRACE
+FunctionDefinition ::= LPAREN FunctionParamters? RPAREN ARROW LBRACE Statement* ReturnStatement RBRACE
+
+FunctionParameters ::= IDENTIFIER ("," IDENTIFIER)*
 
 ReturnStatement ::= RETURN Expression SEMICOLON --TODO: I dont like this

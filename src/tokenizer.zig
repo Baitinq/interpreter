@@ -23,6 +23,7 @@ pub const TokenType = enum {
 
     // Punctuation
     SEMICOLON,
+    COMMA,
     LPAREN,
     RPAREN,
     LBRACE,
@@ -39,6 +40,7 @@ pub const Token = union(TokenType) {
     EQUALS: void,
     PLUS: void,
     SEMICOLON: void,
+    COMMA: void,
     LPAREN: void,
     RPAREN: void,
     LBRACE: void,
@@ -64,6 +66,7 @@ pub const Tokenizer = struct {
 
         if (self.accept_substr("=>")) return Token{ .ARROW = void{} };
         if (c == ';') return Token{ .SEMICOLON = void{} };
+        if (c == ',') return Token{ .COMMA = void{} };
         if (c == '(') return Token{ .LPAREN = void{} };
         if (c == ')') return Token{ .RPAREN = void{} };
         if (c == '{') return Token{ .LBRACE = void{} };
