@@ -13,14 +13,9 @@ const Variable = union(VariableType) {
     FUNCTION_DEFINITION: *parser.Node,
 };
 
-const Scope = struct {
-    variables: std.StringHashMap(?*Variable),
-};
-
 pub const Evaluator = struct {
     ast: ?*parser.Node,
-    scope_stack: std.ArrayList(*Scope),
-    //TODO: CREATE STACK WITH SCOPES AND WE CAN SEARCH UP SCOPES
+    environment: *Environment,
 
     allocator: std.mem.Allocator,
 
@@ -29,7 +24,7 @@ pub const Evaluator = struct {
         const evaluator = try allocator.create(Evaluator);
         evaluator.* = .{
             .ast = null,
-            .scope_stack = std.ArrayList(*Scope).init(allocator),
+            .environment = try Environment.init(arena_allocator),
             .allocator = allocator,
         };
         return evaluator;
@@ -45,8 +40,8 @@ pub const Evaluator = struct {
             try self.evaluate_statement(stmt);
         }
 
-        const main = self.variables.get("main") orelse return EvaluatorError.EvaluationError;
-        return try self.evaluate_function_definition(main.?.FUNCTION_DEFINITION);
+        const main = self.environment.get_variable("main") orelse return EvaluatorError.EvaluationError;
+        return try self.evaluate_function_definition(main.FUNCTION_DEFINITION);
     }
 
     fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!void {
@@ -68,24 +63,26 @@ pub const Evaluator = struct {
 
         //TODO: We should lowercase keys no?
         if (assignment_statement.is_declaration) {
-            try self.variables.put(assignment_statement.name, null);
+            try self.environment.add_variable(assignment_statement.name, null);
         }
 
-        if (!self.variables.contains(assignment_statement.name)) {
+        if (!self.environment.contains_variable(assignment_statement.name)) {
             std.debug.print("Variable not found: {s}\n", .{assignment_statement.name});
             return EvaluatorError.EvaluationError;
         }
 
+        var variable: *Variable = undefined;
         if (assignment_statement.expression.* == parser.Node.FUNCTION_DEFINITION) {
-            try self.variables.put(assignment_statement.name, try self.create_variable(.{
+            variable = try self.create_variable(.{
                 .FUNCTION_DEFINITION = assignment_statement.expression,
-            }));
+            });
         } else {
             const val = try self.get_expression_value(assignment_statement.expression);
-            try self.variables.put(assignment_statement.name, try self.create_variable(.{
+            variable = try self.create_variable(.{
                 .NUMBER = val,
-            }));
+            });
         }
+        try self.environment.add_variable(assignment_statement.name, variable);
     }
 
     fn evaluate_function_call_statement(self: *Evaluator, node: *parser.Node) !i64 {
@@ -101,9 +98,9 @@ pub const Evaluator = struct {
             return 0;
         }
 
-        const val = self.variables.get(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
+        const val = self.environment.get_variable(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
 
-        return self.evaluate_function_definition(val.?.FUNCTION_DEFINITION); //TODO: Pass arguments to this
+        return self.evaluate_function_definition(val.FUNCTION_DEFINITION); //TODO: Pass arguments to this
     }
 
     fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !i64 {
@@ -128,21 +125,21 @@ pub const Evaluator = struct {
                 switch (x) {
                     .NUMBER => |number| return number.value,
                     .IDENTIFIER => |identifier| {
-                        const val = self.variables.get(identifier.name) orelse {
+                        const val = self.environment.get_variable(identifier.name) orelse {
                             std.debug.print("Identifier {any} not found\n", .{identifier.name});
                             return EvaluatorError.EvaluationError;
                         };
 
-                        return val.?.NUMBER;
+                        return val.NUMBER;
                     },
                     else => unreachable,
                 }
             },
             // I don't like having 2 places where we evaluate functions
             .FUNCTION_CALL_STATEMENT => |x| {
-                const func = self.variables.get(x.name) orelse return EvaluatorError.EvaluationError;
+                const func = self.environment.get_variable(x.name) orelse return EvaluatorError.EvaluationError;
 
-                return try self.evaluate_function_definition(func.?.FUNCTION_DEFINITION);
+                return try self.evaluate_function_definition(func.FUNCTION_DEFINITION);
             },
 
             else => unreachable,
@@ -170,6 +167,65 @@ pub const Evaluator = struct {
         const variable = try self.allocator.create(Variable);
         variable.* = variable_value;
         return variable;
+    }
+};
+
+const Scope = struct {
+    variables: std.StringHashMap(?*Variable),
+};
+
+const Environment = struct {
+    scope_stack: std.ArrayList(*Scope),
+
+    allocator: std.mem.Allocator,
+
+    fn init(arena_allocator: *std.heap.ArenaAllocator) !*Environment {
+        const allocator = arena_allocator.allocator();
+        const self = try allocator.create(Environment);
+
+        self.* = .{
+            .scope_stack = std.ArrayList(*Scope).init(allocator),
+            .allocator = allocator,
+        };
+
+        //TODO: Add more scopes when evaluating functions
+        // Create global scope
+        try self.create_scope();
+
+        return self;
+    }
+
+    fn create_scope(self: *Environment) !void {
+        const global_scope = try self.allocator.create(Scope);
+        global_scope.* = .{
+            .variables = std.StringHashMap(?*Variable).init(self.allocator),
+        };
+        try self.scope_stack.append(global_scope);
+    }
+
+    fn drop_scope() !void {}
+
+    fn add_variable(self: *Environment, name: []const u8, variable: ?*Variable) !void {
+        try self.scope_stack.getLast().variables.put(name, variable);
+    }
+
+    fn get_variable(self: *Environment, name: []const u8) ?*Variable {
+        var i = self.scope_stack.items.len - 1;
+        while (i >= 0) : (i -= 1) {
+            const scope = self.scope_stack.items[i];
+            if (scope.variables.get(name)) |v| return v;
+        }
+        return null;
+    }
+
+    fn contains_variable(self: *Environment, name: []const u8) bool {
+        var i = self.scope_stack.items.len;
+        while (i > 0) {
+            i -= 1;
+            const scope = self.scope_stack.items[i];
+            if (scope.variables.contains(name)) return true;
+        }
+        return false;
     }
 };
 
