@@ -55,6 +55,7 @@ pub const Tokenizer = struct {
 
     pub fn next(self: *Tokenizer) TokenizerError!?Token {
         defer self.offset += 1;
+        self.skip_whitespace();
         self.skip_comments();
         self.skip_whitespace();
 
