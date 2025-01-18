@@ -48,6 +48,7 @@ pub const Node = union(NodeType) {
         },
     },
     ADDITIVE_EXPRESSION: struct {
+        addition: bool,
         lhs: *Node,
         rhs: *Node,
     },
@@ -216,15 +217,18 @@ pub const Parser = struct {
             return ParserError.ParsingError;
     }
 
-    // AdditiveExpression ::= PrimaryExpression ("+" AdditiveExpression)
+    // AdditiveExpression ::= PrimaryExpression (("+" | "-") AdditiveExpression)
     fn parse_additive_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
 
         const lhs = try self.parse_primary_expression();
 
-        if (self.accept_token(tokenizer.TokenType.PLUS) != null) {
+        const plus = self.accept_token(tokenizer.TokenType.PLUS);
+        const minus = self.accept_token(tokenizer.TokenType.MINUS);
+        if (plus != null or minus != null) {
             const rhs = try self.parse_additive_expression();
             return self.create_node(.{ .ADDITIVE_EXPRESSION = .{
+                .addition = plus != null,
                 .lhs = lhs,
                 .rhs = rhs,
             } });

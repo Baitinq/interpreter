@@ -12,11 +12,9 @@ ReturnStatement ::= RETURN Expression
 
 FunctionArguments ::= Expression ("," Expression)*
 
---TODO: ==
-
 Expression   ::= AdditiveExpression | FunctionDefinition
 
-AdditiveExpression ::= PrimaryExpression ("+" AdditiveExpression)
+AdditiveExpression ::= PrimaryExpression (("+" | "-") AdditiveExpression)
 
 PrimaryExpression ::= NUMBER | IDENTIFIER | FunctionCallStatement
 

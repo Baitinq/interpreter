@@ -20,6 +20,7 @@ pub const TokenType = enum {
     // Operators
     EQUALS,
     PLUS,
+    MINUS,
 
     // Punctuation
     SEMICOLON,
@@ -39,6 +40,7 @@ pub const Token = union(TokenType) {
     NUMBER: i64,
     EQUALS: void,
     PLUS: void,
+    MINUS: void,
     SEMICOLON: void,
     COMMA: void,
     LPAREN: void,
@@ -74,6 +76,7 @@ pub const Tokenizer = struct {
         if (c == '}') return Token{ .RBRACE = void{} };
         if (c == '=') return Token{ .EQUALS = void{} };
         if (c == '+') return Token{ .PLUS = void{} };
+        if (c == '-') return Token{ .MINUS = void{} };
 
         const string = self.consume_string();
         if (string.len == 0) return TokenizerError.TokenizingError;

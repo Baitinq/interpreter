@@ -136,7 +136,8 @@ pub const Evaluator = struct {
             .ADDITIVE_EXPRESSION => |x| {
                 const lhs = try self.get_expression_value(x.lhs);
                 const rhs = try self.get_expression_value(x.rhs);
-                return lhs + rhs;
+                if (x.addition) return lhs + rhs;
+                return lhs - rhs;
             },
             .PRIMARY_EXPRESSION => |x| {
                 switch (x) {
