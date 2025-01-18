@@ -6,36 +6,43 @@ const EvaluatorError = error{
     OutOfMemory,
 };
 
+const VariableType = enum { NUMBER, FUNCTION };
+
+const Variable = union(VariableType) {
+    NUMBER: i64,
+    FUNCTION: *parser.Node,
+};
+
 pub const Evaluator = struct {
     ast: ?*parser.Node,
-    variables: std.StringHashMap(?i64),
+    variables: std.StringHashMap(?*Variable),
     //TODO: CREATE STACK WITH SCOPES AND WE CAN SEARCH UP SCOPES
 
     allocator: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator) !*Evaluator {
+    pub fn init(arena_allocator: *std.heap.ArenaAllocator) !*Evaluator {
+        const allocator = arena_allocator.allocator();
         const evaluator = try allocator.create(Evaluator);
         evaluator.* = .{
             .ast = null,
-            .variables = std.StringHashMap(?i64).init(allocator),
+            .variables = std.StringHashMap(?*Variable).init(allocator),
             .allocator = allocator,
         };
         return evaluator;
-    }
-
-    pub fn deinit(self: *Evaluator) void {
-        self.variables.deinit();
-        self.allocator.destroy(self);
     }
 
     pub fn evaluate_ast(self: *Evaluator, ast: *parser.Node) !i64 {
         errdefer std.debug.print("Error evaluating AST\n", .{});
         std.debug.assert(ast.* == parser.Node.PROGRAM);
 
-        self.ast = ast;
+        const program = ast.PROGRAM;
 
-        const main = self.find_function("main") orelse return EvaluatorError.EvaluationError;
-        return try self.evaluate_function_definition(main);
+        for (program.statements) |stmt| {
+            try self.evaluate_statement(stmt);
+        }
+
+        const main = self.variables.get("main") orelse return EvaluatorError.EvaluationError;
+        return try self.evaluate_function_definition(main.?.FUNCTION);
     }
 
     fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!void {
@@ -65,12 +72,18 @@ pub const Evaluator = struct {
             return EvaluatorError.EvaluationError;
         }
 
-        const val = try self.get_expression_value(assignment_statement.expression);
-
-        try self.variables.put(assignment_statement.name, val);
+        if (assignment_statement.expression.* == parser.Node.FUNCTION_DEFINITION) {
+            try self.variables.put(assignment_statement.name, try self.create_variable(.{
+                .FUNCTION = assignment_statement.expression,
+            }));
+        } else {
+            const val = try self.get_expression_value(assignment_statement.expression);
+            try self.variables.put(assignment_statement.name, try self.create_variable(.{
+                .NUMBER = val,
+            }));
+        }
     }
 
-    // TODO: I dont really see the use of this.
     fn evaluate_function_call_statement(self: *Evaluator, node: *parser.Node) !i64 {
         errdefer std.debug.print("Error evaluating function call statement\n", .{});
         std.debug.assert(node.* == parser.Node.FUNCTION_CALL_STATEMENT);
@@ -86,7 +99,7 @@ pub const Evaluator = struct {
 
         const val = self.variables.get(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
 
-        return val.?;
+        return self.evaluate_function_definition(val.?.FUNCTION); //TODO: Pass arguments to this
     }
 
     fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !i64 {
@@ -116,15 +129,15 @@ pub const Evaluator = struct {
                             return EvaluatorError.EvaluationError;
                         };
 
-                        return val.?;
+                        return val.?.NUMBER;
                     },
                     else => unreachable,
                 }
             },
             .FUNCTION_CALL_STATEMENT => |x| {
-                const func = self.find_function(x.name) orelse return EvaluatorError.EvaluationError;
+                const func = self.variables.get(x.name) orelse return EvaluatorError.EvaluationError;
 
-                return try self.evaluate_function_definition(func);
+                return try self.evaluate_function_definition(func.?.FUNCTION);
             },
 
             else => unreachable,
@@ -148,20 +161,10 @@ pub const Evaluator = struct {
         return try self.evaluate_return_statement(return_stmt);
     }
 
-    fn find_function(self: *Evaluator, name: []const u8) ?*parser.Node {
-        errdefer std.debug.print("Error finding main function\n", .{});
-        std.debug.assert(self.ast.?.* == parser.Node.PROGRAM);
-
-        for (self.ast.?.PROGRAM.statements) |*statement| {
-            const x = statement.*.STATEMENT.statement;
-            if (x.* != parser.Node.ASSIGNMENT_STATEMENT) continue;
-            const y = x.*.ASSIGNMENT_STATEMENT;
-            if (y.is_declaration and std.mem.eql(u8, y.name, name)) {
-                return y.expression;
-            }
-        }
-
-        return null;
+    fn create_variable(self: *Evaluator, variable_value: Variable) !*Variable {
+        const variable = try self.allocator.create(Variable);
+        variable.* = variable_value;
+        return variable;
     }
 };
 

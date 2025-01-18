@@ -17,11 +17,10 @@ pub fn main() !void {
         if (deinit_status == .leak) @panic("Memory leak detected!");
     }
 
-    const source_evaluator = try evaluator.Evaluator.init(allocator);
-    defer source_evaluator.deinit();
-
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
+
+    const source_evaluator = try evaluator.Evaluator.init(&arena);
 
     if (std.mem.eql(u8, path, "-i")) {
         while (true) {
