@@ -6,16 +6,20 @@ const EvaluatorError = error{
     OutOfMemory,
 };
 
-const VariableType = enum { NUMBER, FUNCTION };
+const VariableType = enum { NUMBER, FUNCTION_DEFINITION };
 
 const Variable = union(VariableType) {
     NUMBER: i64,
-    FUNCTION: *parser.Node,
+    FUNCTION_DEFINITION: *parser.Node,
+};
+
+const Scope = struct {
+    variables: std.StringHashMap(?*Variable),
 };
 
 pub const Evaluator = struct {
     ast: ?*parser.Node,
-    variables: std.StringHashMap(?*Variable),
+    scope_stack: std.ArrayList(*Scope),
     //TODO: CREATE STACK WITH SCOPES AND WE CAN SEARCH UP SCOPES
 
     allocator: std.mem.Allocator,
@@ -25,7 +29,7 @@ pub const Evaluator = struct {
         const evaluator = try allocator.create(Evaluator);
         evaluator.* = .{
             .ast = null,
-            .variables = std.StringHashMap(?*Variable).init(allocator),
+            .scope_stack = std.ArrayList(*Scope).init(allocator),
             .allocator = allocator,
         };
         return evaluator;
@@ -42,7 +46,7 @@ pub const Evaluator = struct {
         }
 
         const main = self.variables.get("main") orelse return EvaluatorError.EvaluationError;
-        return try self.evaluate_function_definition(main.?.FUNCTION);
+        return try self.evaluate_function_definition(main.?.FUNCTION_DEFINITION);
     }
 
     fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!void {
@@ -74,7 +78,7 @@ pub const Evaluator = struct {
 
         if (assignment_statement.expression.* == parser.Node.FUNCTION_DEFINITION) {
             try self.variables.put(assignment_statement.name, try self.create_variable(.{
-                .FUNCTION = assignment_statement.expression,
+                .FUNCTION_DEFINITION = assignment_statement.expression,
             }));
         } else {
             const val = try self.get_expression_value(assignment_statement.expression);
@@ -99,7 +103,7 @@ pub const Evaluator = struct {
 
         const val = self.variables.get(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
 
-        return self.evaluate_function_definition(val.?.FUNCTION); //TODO: Pass arguments to this
+        return self.evaluate_function_definition(val.?.FUNCTION_DEFINITION); //TODO: Pass arguments to this
     }
 
     fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !i64 {
@@ -134,10 +138,11 @@ pub const Evaluator = struct {
                     else => unreachable,
                 }
             },
+            // I don't like having 2 places where we evaluate functions
             .FUNCTION_CALL_STATEMENT => |x| {
                 const func = self.variables.get(x.name) orelse return EvaluatorError.EvaluationError;
 
-                return try self.evaluate_function_definition(func.?.FUNCTION);
+                return try self.evaluate_function_definition(func.?.FUNCTION_DEFINITION);
             },
 
             else => unreachable,
