@@ -1,8 +1,13 @@
-let print_input = (input) => {
-	print(input);
-	return input;
+let foo = () => {
+	let x = 1;
+	print(x);
+	return x;
 };
 
 let main = () => {
-	return print_input(7);
+	let x = 2;
+	/* As you see, the language supports variable scopes */
+	foo();
+	print(x);
+	return x;
 };
