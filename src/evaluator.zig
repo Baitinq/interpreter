@@ -41,7 +41,7 @@ pub const Evaluator = struct {
         }
 
         const main = self.environment.get_variable("main") orelse return EvaluatorError.EvaluationError;
-        return try self.evaluate_function_definition(main.FUNCTION_DEFINITION);
+        return try self.evaluate_function_definition(main.FUNCTION_DEFINITION, &[_]*parser.Node{});
     }
 
     fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!void {
@@ -71,21 +71,11 @@ pub const Evaluator = struct {
             return EvaluatorError.EvaluationError;
         }
 
-        var variable: *Variable = undefined;
-        if (assignment_statement.expression.* == parser.Node.FUNCTION_DEFINITION) {
-            variable = try self.create_variable(.{
-                .FUNCTION_DEFINITION = assignment_statement.expression,
-            });
-        } else {
-            const val = try self.get_expression_value(assignment_statement.expression);
-            variable = try self.create_variable(.{
-                .NUMBER = val,
-            });
-        }
+        const variable = try self.create_variable(assignment_statement.expression);
         try self.environment.add_variable(assignment_statement.name, variable);
     }
 
-    fn evaluate_function_call_statement(self: *Evaluator, node: *parser.Node) !i64 {
+    fn evaluate_function_call_statement(self: *Evaluator, node: *parser.Node) EvaluatorError!i64 {
         errdefer std.debug.print("Error evaluating function call statement\n", .{});
         std.debug.assert(node.* == parser.Node.FUNCTION_CALL_STATEMENT);
 
@@ -98,9 +88,9 @@ pub const Evaluator = struct {
             return 0;
         }
 
-        const val = self.environment.get_variable(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
+        const function_definition = self.environment.get_variable(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
 
-        return self.evaluate_function_definition(val.FUNCTION_DEFINITION); //TODO: Pass arguments to this
+        return self.evaluate_function_definition(function_definition.FUNCTION_DEFINITION, function_call_statement.arguments);
     }
 
     fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !i64 {
@@ -136,17 +126,13 @@ pub const Evaluator = struct {
                 }
             },
             // I don't like having 2 places where we evaluate functions
-            .FUNCTION_CALL_STATEMENT => |x| {
-                const func = self.environment.get_variable(x.name) orelse return EvaluatorError.EvaluationError;
-
-                return try self.evaluate_function_definition(func.FUNCTION_DEFINITION);
-            },
+            .FUNCTION_CALL_STATEMENT => return try self.evaluate_function_call_statement(node),
 
             else => unreachable,
         }
     }
 
-    fn evaluate_function_definition(self: *Evaluator, node: *parser.Node) EvaluatorError!i64 {
+    fn evaluate_function_definition(self: *Evaluator, node: *parser.Node, arguments: []*parser.Node) EvaluatorError!i64 {
         errdefer std.debug.print("Error evaluating function definition\n", .{});
         std.debug.assert(node.* == parser.Node.FUNCTION_DEFINITION);
 
@@ -155,7 +141,17 @@ pub const Evaluator = struct {
         try self.environment.create_scope();
         defer self.environment.drop_scope();
 
+        std.debug.assert(function_definition.parameters.len == arguments.len);
+
         var i: usize = 0;
+        while (i < arguments.len) : (i += 1) {
+            const parameter = function_definition.parameters[i];
+            const argument = arguments[i];
+
+            try self.environment.add_variable(parameter.PRIMARY_EXPRESSION.IDENTIFIER.name, try self.create_variable(argument));
+        }
+
+        i = 0;
         while (i < function_definition.statements.len - 1) {
             const stmt = function_definition.statements[i];
             try self.evaluate_statement(stmt);
@@ -166,9 +162,19 @@ pub const Evaluator = struct {
         return try self.evaluate_return_statement(return_stmt);
     }
 
-    fn create_variable(self: *Evaluator, variable_value: Variable) !*Variable {
+    fn create_variable(self: *Evaluator, node: *parser.Node) !*Variable {
         const variable = try self.allocator.create(Variable);
-        variable.* = variable_value;
+        if (node.* == parser.Node.FUNCTION_DEFINITION) {
+            variable.* = .{
+                .FUNCTION_DEFINITION = node,
+            };
+        } else {
+            const val = try self.get_expression_value(node);
+            variable.* = .{
+                .NUMBER = val,
+            };
+        }
+
         return variable;
     }
 };
@@ -215,8 +221,9 @@ const Environment = struct {
     }
 
     fn get_variable(self: *Environment, name: []const u8) ?*Variable {
-        var i = self.scope_stack.items.len - 1;
-        while (i >= 0) : (i -= 1) {
+        var i = self.scope_stack.items.len;
+        while (i > 0) {
+            i -= 1;
             const scope = self.scope_stack.items[i];
             if (scope.variables.get(name)) |v| return v;
         }

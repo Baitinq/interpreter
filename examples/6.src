@@ -1,8 +1,10 @@
-let print_input = (input) => {
-	print(input);
-	return input;
+let print_input = (input_a, input_b) => {
+	print(input_a);
+	print(input_b);
+	return input_a + input_b;
 };
 
 let main = () => {
-	return print_input(7);
+	let i = print_input(1,4);
+	return print_input(7, 2) + i;
 };
