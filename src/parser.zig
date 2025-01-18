@@ -10,7 +10,6 @@ const NodeType = enum {
     PROGRAM,
     STATEMENT,
     ASSIGNMENT_STATEMENT,
-    PRINT_STATEMENT,
     FUNCTION_CALL_STATEMENT,
     EXPRESSION,
     ADDITIVE_EXPRESSION,
@@ -29,9 +28,6 @@ pub const Node = union(NodeType) {
     ASSIGNMENT_STATEMENT: struct {
         is_declaration: bool,
         name: []const u8,
-        expression: *Node,
-    },
-    PRINT_STATEMENT: struct {
         expression: *Node,
     },
     FUNCTION_CALL_STATEMENT: struct {
@@ -105,13 +101,11 @@ pub const Parser = struct {
         } });
     }
 
-    // Statement ::= (AssignmentStatement | PrintStatement | FunctionCallStatement) SEMICOLON
+    // Statement ::= (AssignmentStatement | FunctionCallStatement) SEMICOLON
     fn parse_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing statement\n", .{});
 
-        const statement =
-            self.accept_parse(parse_print_statement) orelse
-            self.accept_parse(parse_function_call_statement) orelse
+        const statement = self.accept_parse(parse_function_call_statement) orelse
             try self.parse_assignment_statement();
 
         _ = try self.accept_token(tokenizer.TokenType.SEMICOLON);
@@ -142,24 +136,6 @@ pub const Parser = struct {
             .ASSIGNMENT_STATEMENT = .{
                 .is_declaration = is_declaration,
                 .name = try self.allocator.dupe(u8, identifier.IDENTIFIER),
-                .expression = @constCast(expression),
-            },
-        });
-    }
-
-    // PrintStatement :== PRINT LPAREN Expression RPAREN
-    fn parse_print_statement(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing print statement\n", .{});
-        _ = try self.accept_token(tokenizer.TokenType.PRINT);
-
-        _ = try self.accept_token(tokenizer.TokenType.LPAREN);
-
-        const expression = try self.parse_expression();
-
-        _ = try self.accept_token(tokenizer.TokenType.RPAREN);
-
-        return self.create_node(.{
-            .PRINT_STATEMENT = .{
                 .expression = @constCast(expression),
             },
         });

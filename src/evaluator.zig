@@ -44,7 +44,6 @@ pub const Evaluator = struct {
 
         return switch (statement.STATEMENT.statement.*) {
             .ASSIGNMENT_STATEMENT => |*assignment_statement| try self.evaluate_assignment_statement(@ptrCast(assignment_statement)),
-            .PRINT_STATEMENT => |*print_statement| try self.evaluate_print_statement(@ptrCast(print_statement)),
             .FUNCTION_CALL_STATEMENT => |*function_call_statement| _ = try self.evaluate_function_call_statement(@ptrCast(function_call_statement)),
             else => unreachable,
         };
@@ -71,20 +70,21 @@ pub const Evaluator = struct {
         try self.variables.put(assignment_statement.name, val);
     }
 
-    fn evaluate_print_statement(self: *Evaluator, print_statement: *parser.Node) !void {
-        errdefer std.debug.print("Error evaluating print statement\n", .{});
-        std.debug.assert(print_statement.* == parser.Node.PRINT_STATEMENT);
-
-        const print_value = try self.get_expression_value(print_statement.PRINT_STATEMENT.expression);
-
-        std.debug.print("PRINT: {d}\n", .{print_value});
-    }
-
-    fn evaluate_function_call_statement(self: *Evaluator, function_call_statement: *parser.Node) !i64 {
+    // TODO: I dont really see the use of this.
+    fn evaluate_function_call_statement(self: *Evaluator, node: *parser.Node) !i64 {
         errdefer std.debug.print("Error evaluating function call statement\n", .{});
-        std.debug.assert(function_call_statement.* == parser.Node.FUNCTION_CALL_STATEMENT);
+        std.debug.assert(node.* == parser.Node.FUNCTION_CALL_STATEMENT);
 
-        const val = self.variables.get(function_call_statement.FUNCTION_CALL_STATEMENT.name) orelse return EvaluatorError.EvaluationError;
+        const function_call_statement = node.FUNCTION_CALL_STATEMENT;
+
+        // Print function implementation
+        if (std.mem.eql(u8, function_call_statement.name, "print")) {
+            std.debug.assert(function_call_statement.arguments.len == 1);
+            std.debug.print("PRINT: {any}\n", .{try self.get_expression_value(function_call_statement.arguments[0])});
+            return 0;
+        }
+
+        const val = self.variables.get(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
 
         return val.?;
     }

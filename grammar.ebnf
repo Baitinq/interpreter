@@ -1,10 +1,8 @@
 Program      ::= Statement+
 
-Statement    ::= (AssignmentStatement | PrintStatement | FunctionCallStatement) SEMICOLON
+Statement    ::= (AssignmentStatement | FunctionCallStatement) SEMICOLON
 
 AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
-
-PrintStatement ::= PRINT LPAREN Expression RPAREN -- TODO: this won't be needed once functions support arguments
 
 FunctionCallStatement ::= IDENTIFIER LPAREN FunctionArguments? RPAREN
 
