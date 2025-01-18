@@ -11,6 +11,7 @@ const NodeType = enum {
     STATEMENT,
     ASSIGNMENT_STATEMENT,
     FUNCTION_CALL_STATEMENT,
+    IF_STATEMENT,
     EXPRESSION,
     ADDITIVE_EXPRESSION,
     PRIMARY_EXPRESSION,
@@ -33,6 +34,10 @@ pub const Node = union(NodeType) {
     FUNCTION_CALL_STATEMENT: struct {
         name: []const u8,
         arguments: []*Node,
+    },
+    IF_STATEMENT: struct {
+        condition: *Node,
+        statements: []*Node,
     },
     EXPRESSION: union(enum) {
         ADDITIVE_EXPRESSION: struct {
@@ -101,14 +106,16 @@ pub const Parser = struct {
         } });
     }
 
-    // Statement ::= (AssignmentStatement | FunctionCallStatement) SEMICOLON
+    // Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | ReturnStatement) SEMICOLON
     fn parse_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing statement\n", .{});
 
         const statement = self.accept_parse(parse_function_call_statement) orelse
+            self.accept_parse(parse_if_statement) orelse
+            self.accept_parse(parse_return_statement) orelse
             try self.parse_assignment_statement();
 
-        _ = try self.require_token(tokenizer.TokenType.SEMICOLON);
+        _ = try self.parse_token(tokenizer.TokenType.SEMICOLON);
 
         return self.create_node(.{
             .STATEMENT = .{
@@ -126,9 +133,9 @@ pub const Parser = struct {
             is_declaration = true;
         }
 
-        const identifier = try self.require_token(tokenizer.TokenType.IDENTIFIER);
+        const identifier = try self.parse_token(tokenizer.TokenType.IDENTIFIER);
 
-        _ = try self.require_token(tokenizer.TokenType.EQUALS);
+        _ = try self.parse_token(tokenizer.TokenType.EQUALS);
 
         const expression = try self.parse_expression();
 
@@ -145,13 +152,13 @@ pub const Parser = struct {
     fn parse_function_call_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function call statement\n", .{});
 
-        const identifier = try self.require_token(tokenizer.TokenType.IDENTIFIER);
+        const identifier = try self.parse_token(tokenizer.TokenType.IDENTIFIER);
 
-        _ = try self.require_token(tokenizer.TokenType.LPAREN);
+        _ = try self.parse_token(tokenizer.TokenType.LPAREN);
 
         const arguments = try self.parse_function_arguments();
 
-        _ = try self.require_token(tokenizer.TokenType.RPAREN);
+        _ = try self.parse_token(tokenizer.TokenType.RPAREN);
 
         return self.create_node(.{ .FUNCTION_CALL_STATEMENT = .{
             .name = try self.allocator.dupe(u8, identifier.IDENTIFIER),
@@ -175,6 +182,29 @@ pub const Parser = struct {
         }
 
         return node_list.items;
+    }
+
+    // IfStatement ::= "if" Expression LBRACE Statement* RBRACE
+    fn parse_if_statement(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing if statement\n", .{});
+
+        _ = try self.parse_token(tokenizer.TokenType.IF);
+
+        const expression = try self.parse_expression();
+
+        _ = try self.parse_token(tokenizer.TokenType.LBRACE);
+
+        var statements = std.ArrayList(*Node).init(self.allocator);
+        while (self.accept_parse(parse_statement)) |expr| {
+            try statements.append(expr);
+        }
+
+        _ = try self.parse_token(tokenizer.TokenType.RBRACE);
+
+        return try self.create_node(.{ .IF_STATEMENT = .{
+            .condition = expression,
+            .statements = statements.items,
+        } });
     }
 
     // Expression   ::= AdditiveExpression | FunctionDefinition
@@ -234,23 +264,23 @@ pub const Parser = struct {
     fn parse_function_definition(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function definition\n", .{});
 
-        _ = try self.require_token(tokenizer.TokenType.LPAREN);
+        _ = try self.parse_token(tokenizer.TokenType.LPAREN);
 
         const parameters = try self.parse_function_parameters();
 
-        _ = try self.require_token(tokenizer.TokenType.RPAREN);
+        _ = try self.parse_token(tokenizer.TokenType.RPAREN);
 
-        _ = try self.require_token(tokenizer.TokenType.ARROW);
-        _ = try self.require_token(tokenizer.TokenType.LBRACE);
+        _ = try self.parse_token(tokenizer.TokenType.ARROW);
+        _ = try self.parse_token(tokenizer.TokenType.LBRACE);
 
         var nodes = std.ArrayList(*Node).init(self.allocator);
         while (self.accept_parse(parse_statement)) |expression| {
             try nodes.append(expression);
         }
 
-        try nodes.append(try self.parse_return_statement());
+        std.debug.assert(nodes.getLast().STATEMENT.statement.* == .RETURN_STATEMENT);
 
-        _ = try self.require_token(tokenizer.TokenType.RBRACE);
+        _ = try self.parse_token(tokenizer.TokenType.RBRACE);
 
         return self.create_node(.{ .FUNCTION_DEFINITION = .{
             .statements = nodes.items,
@@ -283,14 +313,12 @@ pub const Parser = struct {
         return node_list.items;
     }
 
-    // ReturnStatement :== RETURN Expression
+    // ReturnStatement ::= RETURN Expression
     fn parse_return_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing return statement\n", .{});
-        _ = try self.require_token(tokenizer.TokenType.RETURN);
+        _ = try self.parse_token(tokenizer.TokenType.RETURN);
 
         const expression = try self.parse_expression();
-
-        _ = try self.require_token(tokenizer.TokenType.SEMICOLON); //TODO: I dont like this
 
         return self.create_node(.{
             .RETURN_STATEMENT = .{
@@ -318,7 +346,7 @@ pub const Parser = struct {
         return null;
     }
 
-    fn require_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
+    fn parse_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
         errdefer if (!self.try_context) std.debug.print("Error accepting token: {any}\n", .{expected_token});
         const token = self.peek_token() orelse return ParserError.ParsingError;
 

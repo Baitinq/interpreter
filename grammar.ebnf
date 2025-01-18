@@ -1,12 +1,18 @@
 Program      ::= Statement+
 
-Statement    ::= (AssignmentStatement | FunctionCallStatement) SEMICOLON
+Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | ReturnStatement) SEMICOLON
 
 AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
 
 FunctionCallStatement ::= IDENTIFIER LPAREN FunctionArguments? RPAREN
 
+IfStatement ::= "if" Expression LBRACE Statement* RBRACE -- TODO: Should function definitions be allowed?
+
+ReturnStatement ::= RETURN Expression
+
 FunctionArguments ::= Expression ("," Expression)*
+
+--TODO: ==
 
 Expression   ::= AdditiveExpression | FunctionDefinition
 
@@ -14,8 +20,7 @@ AdditiveExpression ::= PrimaryExpression ("+" AdditiveExpression)
 
 PrimaryExpression ::= NUMBER | IDENTIFIER | FunctionCallStatement
 
-FunctionDefinition ::= LPAREN FunctionParamters? RPAREN ARROW LBRACE Statement* ReturnStatement RBRACE
+FunctionDefinition ::= LPAREN FunctionParamters? RPAREN ARROW LBRACE Statement* ReturnStatement SEMICOLON RBRACE
 
 FunctionParameters ::= IDENTIFIER ("," IDENTIFIER)*
 
-ReturnStatement ::= RETURN Expression SEMICOLON --TODO: I dont like this

@@ -7,6 +7,7 @@ const TokenizerError = error{
 pub const TokenType = enum {
     // Keywords
     LET,
+    IF,
     RETURN,
     ARROW,
 
@@ -31,6 +32,7 @@ pub const TokenType = enum {
 
 pub const Token = union(TokenType) {
     LET: void,
+    IF: void,
     RETURN: void,
     ARROW: void,
     IDENTIFIER: []u8,
@@ -77,6 +79,7 @@ pub const Tokenizer = struct {
         if (string.len == 0) return TokenizerError.TokenizingError;
 
         if (std.mem.eql(u8, string, "let")) return Token{ .LET = void{} };
+        if (std.mem.eql(u8, string, "if")) return Token{ .IF = void{} };
         if (std.mem.eql(u8, string, "return")) return Token{ .RETURN = void{} };
 
         if (std.fmt.parseInt(i32, string, 10) catch null) |i| return Token{ .NUMBER = i };

@@ -4,7 +4,7 @@ let main = () => {
 	if i == 4 {
 		print(i);
 		return i;
-	}
+	};
 
 	return 1;
 };

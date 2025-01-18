@@ -37,22 +37,34 @@ pub const Evaluator = struct {
         const program = ast.PROGRAM;
 
         for (program.statements) |stmt| {
-            try self.evaluate_statement(stmt);
+            _ = try self.evaluate_statement(stmt);
         }
 
         const main = self.environment.get_variable("main") orelse return EvaluatorError.EvaluationError;
         return try self.evaluate_function_definition(main.FUNCTION_DEFINITION, &[_]*parser.Node{});
     }
 
-    fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!void {
+    fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!?i64 {
         errdefer std.debug.print("Error evaluating statement\n", .{});
         std.debug.assert(statement.* == parser.Node.STATEMENT);
 
-        return switch (statement.STATEMENT.statement.*) {
-            .ASSIGNMENT_STATEMENT => |*assignment_statement| try self.evaluate_assignment_statement(@ptrCast(assignment_statement)),
-            .FUNCTION_CALL_STATEMENT => |*function_call_statement| _ = try self.evaluate_function_call_statement(@ptrCast(function_call_statement)),
+        switch (statement.STATEMENT.statement.*) {
+            .ASSIGNMENT_STATEMENT => |*assignment_statement| {
+                try self.evaluate_assignment_statement(@ptrCast(assignment_statement));
+                return null;
+            },
+            .FUNCTION_CALL_STATEMENT => |*function_call_statement| {
+                _ = try self.evaluate_function_call_statement(@ptrCast(function_call_statement));
+                return null;
+            },
+            .IF_STATEMENT => |*if_statement| {
+                return try self.evaluate_if_statement(@ptrCast(if_statement));
+            },
+            .RETURN_STATEMENT => |*return_statement| return try self.evaluate_return_statement(@ptrCast(return_statement)),
             else => unreachable,
-        };
+        }
+
+        return null;
     }
 
     fn evaluate_assignment_statement(self: *Evaluator, node: *parser.Node) !void {
@@ -91,6 +103,21 @@ pub const Evaluator = struct {
         const function_definition = self.environment.get_variable(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
 
         return self.evaluate_function_definition(function_definition.FUNCTION_DEFINITION, function_call_statement.arguments);
+    }
+
+    fn evaluate_if_statement(self: *Evaluator, node: *parser.Node) !?i64 {
+        errdefer std.debug.print("Error evaluating if statement\n", .{});
+        std.debug.assert(node.* == parser.Node.IF_STATEMENT);
+
+        const if_statement = node.IF_STATEMENT;
+
+        const if_condition_val = try self.get_expression_value(if_statement.condition);
+
+        if (if_condition_val != 0) return null;
+
+        if (try self.evaluate_block_statements(if_statement.statements)) |ret| return ret;
+
+        return null;
     }
 
     fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !i64 {
@@ -151,15 +178,20 @@ pub const Evaluator = struct {
             try self.environment.add_variable(parameter.PRIMARY_EXPRESSION.IDENTIFIER.name, try self.create_variable(argument));
         }
 
-        i = 0;
-        while (i < function_definition.statements.len - 1) {
-            const stmt = function_definition.statements[i];
-            try self.evaluate_statement(stmt);
-            i += 1;
-        }
+        if (try self.evaluate_block_statements(function_definition.statements)) |ret| return ret;
 
-        const return_stmt = function_definition.statements[i];
-        return try self.evaluate_return_statement(return_stmt);
+        // We should never get here as there should be a return statement
+        return EvaluatorError.EvaluationError;
+    }
+
+    fn evaluate_block_statements(self: *Evaluator, statements: []*parser.Node) !?i64 {
+        var i: usize = 0;
+        while (i < statements.len) : (i += 1) {
+            const stmt = statements[i];
+            const res = try self.evaluate_statement(stmt);
+            if (res != null) return res.?;
+        }
+        return null;
     }
 
     fn create_variable(self: *Evaluator, node: *parser.Node) !*Variable {
