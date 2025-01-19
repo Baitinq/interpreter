@@ -377,12 +377,14 @@ pub const Parser = struct {
 
     fn accept_parse(self: *Parser, parsing_func: *const fn (_: *Parser) ParserError!*Node) ?*Node {
         const prev_offset = self.offset;
+        const prev_try_context = self.try_context;
         self.try_context = true;
         const node = parsing_func(self) catch {
             self.offset = prev_offset;
+            self.try_context = prev_try_context;
             return null;
         };
-        self.try_context = false;
+        self.try_context = prev_try_context;
         return node;
     }
 
