@@ -13,6 +13,7 @@ const NodeType = enum {
     FUNCTION_CALL_STATEMENT,
     IF_STATEMENT,
     EXPRESSION,
+    EQUALITY_EXPRESSION,
     ADDITIVE_EXPRESSION,
     PRIMARY_EXPRESSION,
     FUNCTION_DEFINITION,
@@ -40,12 +41,17 @@ pub const Node = union(NodeType) {
         statements: []*Node,
     },
     EXPRESSION: union(enum) {
+        //TODO: Why do we need this
         ADDITIVE_EXPRESSION: struct {
             expression: *Node,
         },
         FUNCTION_DEFINITION: struct {
             expression: *Node,
         },
+    },
+    EQUALITY_EXPRESSION: struct {
+        lhs: *Node,
+        rhs: *Node,
     },
     ADDITIVE_EXPRESSION: struct {
         addition: bool,
@@ -211,16 +217,34 @@ pub const Parser = struct {
         } });
     }
 
-    // Expression   ::= AdditiveExpression | FunctionDefinition
+    // Expression ::= EqualityExpression | AdditiveExpression | FunctionDefinition
     fn parse_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing expression\n", .{});
 
-        return self.accept_parse(parse_additive_expression) orelse
+        return self.accept_parse(parse_equality_expression) orelse
+            self.accept_parse(parse_additive_expression) orelse
             self.accept_parse(parse_function_definition) orelse
             return ParserError.ParsingError;
     }
 
-    // AdditiveExpression ::= PrimaryExpression (("+" | "-") AdditiveExpression)
+    // EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
+    fn parse_equality_expression(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing equality expression\n", .{});
+
+        const lhs = try self.parse_additive_expression();
+
+        _ = try self.parse_token(tokenizer.TokenType.EQUALS);
+        _ = try self.parse_token(tokenizer.TokenType.EQUALS);
+
+        const rhs = try self.parse_additive_expression();
+
+        return self.create_node(.{ .EQUALITY_EXPRESSION = .{
+            .lhs = lhs,
+            .rhs = rhs,
+        } });
+    }
+
+    // AdditiveExpression ::= PrimaryExpression (("+" | "-") AdditiveExpression)?
     fn parse_additive_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
 
@@ -339,6 +363,18 @@ pub const Parser = struct {
         });
     }
 
+    fn parse_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
+        errdefer if (!self.try_context) std.debug.print("Error accepting token: {any}\n", .{expected_token});
+        const token = self.peek_token() orelse return ParserError.ParsingError;
+
+        if (token != expected_token) {
+            if (!self.try_context) std.debug.print("Expected {any} - found {any}\n", .{ expected_token, token });
+            return ParserError.ParsingError;
+        }
+
+        return self.consume_token() orelse unreachable;
+    }
+
     fn accept_parse(self: *Parser, parsing_func: *const fn (_: *Parser) ParserError!*Node) ?*Node {
         const prev_offset = self.offset;
         self.try_context = true;
@@ -356,18 +392,6 @@ pub const Parser = struct {
             return self.consume_token();
         }
         return null;
-    }
-
-    fn parse_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
-        errdefer if (!self.try_context) std.debug.print("Error accepting token: {any}\n", .{expected_token});
-        const token = self.peek_token() orelse return ParserError.ParsingError;
-
-        if (token != expected_token) {
-            if (!self.try_context) std.debug.print("Expected {any} - found {any}\n", .{ expected_token, token });
-            return ParserError.ParsingError;
-        }
-
-        return self.consume_token() orelse unreachable;
     }
 
     fn consume_token(self: *Parser) ?tokenizer.Token {

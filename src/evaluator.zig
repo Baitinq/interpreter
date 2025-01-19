@@ -141,10 +141,14 @@ pub const Evaluator = struct {
                 const lhs = try self.get_expression_value(x.lhs) orelse return EvaluatorError.EvaluationError;
                 const rhs = try self.get_expression_value(x.rhs) orelse return EvaluatorError.EvaluationError;
                 std.debug.assert(lhs.* == .NUMBER and rhs.* == .NUMBER);
-                var res: i64 = undefined;
-                if (x.addition) res = lhs.NUMBER + rhs.NUMBER;
-                res = lhs.NUMBER - rhs.NUMBER;
-                return try self.create_variable(.{ .NUMBER = res });
+                if (x.addition) return try self.create_variable(.{ .NUMBER = lhs.NUMBER + rhs.NUMBER });
+                return try self.create_variable(.{ .NUMBER = lhs.NUMBER - rhs.NUMBER });
+            },
+            .EQUALITY_EXPRESSION => |x| {
+                const lhs = try self.get_expression_value(x.lhs) orelse return EvaluatorError.EvaluationError;
+                const rhs = try self.get_expression_value(x.rhs) orelse return EvaluatorError.EvaluationError;
+                std.debug.assert(lhs.* == .NUMBER and rhs.* == .NUMBER); //TODO: Generic
+                return try self.create_variable(.{ .BOOLEAN = (lhs.NUMBER == rhs.NUMBER) });
             },
             .PRIMARY_EXPRESSION => |x| {
                 switch (x) {
