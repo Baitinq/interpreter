@@ -16,6 +16,7 @@ pub const TokenType = enum {
 
     // Literals
     NUMBER,
+    BOOLEAN,
 
     // Operators
     EQUALS,
@@ -38,6 +39,7 @@ pub const Token = union(TokenType) {
     ARROW: void,
     IDENTIFIER: []u8,
     NUMBER: i64,
+    BOOLEAN: bool,
     EQUALS: void,
     PLUS: void,
     MINUS: void,
@@ -84,6 +86,8 @@ pub const Tokenizer = struct {
         if (std.mem.eql(u8, string, "let")) return Token{ .LET = void{} };
         if (std.mem.eql(u8, string, "if")) return Token{ .IF = void{} };
         if (std.mem.eql(u8, string, "return")) return Token{ .RETURN = void{} };
+        if (std.mem.eql(u8, string, "true")) return Token{ .BOOLEAN = true };
+        if (std.mem.eql(u8, string, "false")) return Token{ .BOOLEAN = false };
 
         if (std.fmt.parseInt(i32, string, 10) catch null) |i| return Token{ .NUMBER = i };
 

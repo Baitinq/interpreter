@@ -16,7 +16,7 @@ Expression   ::= AdditiveExpression | FunctionDefinition
 
 AdditiveExpression ::= PrimaryExpression (("+" | "-") AdditiveExpression)
 
-PrimaryExpression ::= NUMBER | IDENTIFIER | FunctionCallStatement
+PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement
 
 FunctionDefinition ::= LPAREN FunctionParamters? RPAREN ARROW LBRACE Statement* ReturnStatement SEMICOLON RBRACE
 

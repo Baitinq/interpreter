@@ -6,10 +6,11 @@ const EvaluatorError = error{
     OutOfMemory,
 };
 
-const VariableType = enum { NUMBER, FUNCTION_DEFINITION };
+const VariableType = enum { NUMBER, BOOLEAN, FUNCTION_DEFINITION };
 
 const Variable = union(VariableType) {
     NUMBER: i64,
+    BOOLEAN: bool,
     FUNCTION_DEFINITION: *parser.Node,
 };
 
@@ -41,10 +42,11 @@ pub const Evaluator = struct {
         }
 
         const main = self.environment.get_variable("main") orelse return EvaluatorError.EvaluationError;
-        return try self.evaluate_function_definition(main.FUNCTION_DEFINITION, &[_]*parser.Node{});
+        const ret = try self.evaluate_function_definition(main.FUNCTION_DEFINITION, &[_]*parser.Node{});
+        return ret.?.NUMBER;
     }
 
-    fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!?i64 {
+    fn evaluate_statement(self: *Evaluator, statement: *parser.Node) EvaluatorError!?*Variable {
         errdefer std.debug.print("Error evaluating statement\n", .{});
         std.debug.assert(statement.* == parser.Node.STATEMENT);
 
@@ -83,11 +85,11 @@ pub const Evaluator = struct {
             return EvaluatorError.EvaluationError;
         }
 
-        const variable = try self.create_variable(assignment_statement.expression);
+        const variable = try self.get_expression_value(assignment_statement.expression);
         try self.environment.add_variable(assignment_statement.name, variable);
     }
 
-    fn evaluate_function_call_statement(self: *Evaluator, node: *parser.Node) EvaluatorError!i64 {
+    fn evaluate_function_call_statement(self: *Evaluator, node: *parser.Node) EvaluatorError!?*Variable {
         errdefer std.debug.print("Error evaluating function call statement\n", .{});
         std.debug.assert(node.* == parser.Node.FUNCTION_CALL_STATEMENT);
 
@@ -97,7 +99,7 @@ pub const Evaluator = struct {
         if (std.mem.eql(u8, function_call_statement.name, "print")) {
             std.debug.assert(function_call_statement.arguments.len == 1);
             std.debug.print("PRINT: {any}\n", .{try self.get_expression_value(function_call_statement.arguments[0])});
-            return 0;
+            return null;
         }
 
         const function_definition = self.environment.get_variable(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
@@ -105,7 +107,7 @@ pub const Evaluator = struct {
         return self.evaluate_function_definition(function_definition.FUNCTION_DEFINITION, function_call_statement.arguments);
     }
 
-    fn evaluate_if_statement(self: *Evaluator, node: *parser.Node) !?i64 {
+    fn evaluate_if_statement(self: *Evaluator, node: *parser.Node) !?*Variable {
         errdefer std.debug.print("Error evaluating if statement\n", .{});
         std.debug.assert(node.* == parser.Node.IF_STATEMENT);
 
@@ -113,54 +115,63 @@ pub const Evaluator = struct {
 
         const if_condition_val = try self.get_expression_value(if_statement.condition);
 
-        if (if_condition_val != 0) return null;
+        std.debug.assert(if_condition_val.?.* == .BOOLEAN);
+
+        if (!if_condition_val.?.BOOLEAN) return null;
 
         if (try self.evaluate_block_statements(if_statement.statements)) |ret| return ret;
 
         return null;
     }
 
-    fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !i64 {
+    fn evaluate_return_statement(self: *Evaluator, return_statement: *parser.Node) !*Variable {
         errdefer std.debug.print("Error evaluating return statement\n", .{});
         std.debug.assert(return_statement.* == parser.Node.RETURN_STATEMENT);
 
         const return_value = try self.get_expression_value(return_statement.RETURN_STATEMENT.expression);
 
-        return return_value;
+        return return_value.?;
     }
 
-    fn get_expression_value(self: *Evaluator, node: *parser.Node) !i64 {
+    fn get_expression_value(self: *Evaluator, node: *parser.Node) !?*Variable {
         errdefer std.debug.print("Error getting statement value\n", .{});
 
         switch (node.*) {
             .ADDITIVE_EXPRESSION => |x| {
-                const lhs = try self.get_expression_value(x.lhs);
-                const rhs = try self.get_expression_value(x.rhs);
-                if (x.addition) return lhs + rhs;
-                return lhs - rhs;
+                const lhs = try self.get_expression_value(x.lhs) orelse return EvaluatorError.EvaluationError;
+                const rhs = try self.get_expression_value(x.rhs) orelse return EvaluatorError.EvaluationError;
+                std.debug.assert(lhs.* == .NUMBER and rhs.* == .NUMBER);
+                var res: i64 = undefined;
+                if (x.addition) res = lhs.NUMBER + rhs.NUMBER;
+                res = lhs.NUMBER - rhs.NUMBER;
+                return try self.create_variable(.{ .NUMBER = res });
             },
             .PRIMARY_EXPRESSION => |x| {
                 switch (x) {
-                    .NUMBER => |number| return number.value,
+                    .NUMBER => |number| return self.create_variable(.{ .NUMBER = number.value }),
+                    .BOOLEAN => |b| return self.create_variable(.{ .BOOLEAN = b.value }),
                     .IDENTIFIER => |identifier| {
                         const val = self.environment.get_variable(identifier.name) orelse {
                             std.debug.print("Identifier {any} not found\n", .{identifier.name});
                             return EvaluatorError.EvaluationError;
                         };
 
-                        return val.NUMBER;
+                        return val;
                     },
                     else => unreachable,
                 }
             },
             // I don't like having 2 places where we evaluate functions
             .FUNCTION_CALL_STATEMENT => return try self.evaluate_function_call_statement(node),
+            .FUNCTION_DEFINITION => return try self.create_variable(.{
+                .FUNCTION_DEFINITION = node,
+            }),
 
             else => unreachable,
         }
     }
 
-    fn evaluate_function_definition(self: *Evaluator, node: *parser.Node, arguments: []*parser.Node) EvaluatorError!i64 {
+    fn evaluate_function_definition(self: *Evaluator, node: *parser.Node, arguments: []*parser.Node) EvaluatorError!?*Variable {
         errdefer std.debug.print("Error evaluating function definition\n", .{});
         std.debug.assert(node.* == parser.Node.FUNCTION_DEFINITION);
 
@@ -176,7 +187,7 @@ pub const Evaluator = struct {
             const parameter = function_definition.parameters[i];
             const argument = arguments[i];
 
-            try self.environment.add_variable(parameter.PRIMARY_EXPRESSION.IDENTIFIER.name, try self.create_variable(argument));
+            try self.environment.add_variable(parameter.PRIMARY_EXPRESSION.IDENTIFIER.name, try self.get_expression_value(argument));
         }
 
         if (try self.evaluate_block_statements(function_definition.statements)) |ret| return ret;
@@ -185,7 +196,7 @@ pub const Evaluator = struct {
         return EvaluatorError.EvaluationError;
     }
 
-    fn evaluate_block_statements(self: *Evaluator, statements: []*parser.Node) !?i64 {
+    fn evaluate_block_statements(self: *Evaluator, statements: []*parser.Node) !?*Variable {
         var i: usize = 0;
         while (i < statements.len) : (i += 1) {
             const stmt = statements[i];
@@ -195,19 +206,9 @@ pub const Evaluator = struct {
         return null;
     }
 
-    fn create_variable(self: *Evaluator, node: *parser.Node) !*Variable {
+    fn create_variable(self: *Evaluator, variable_value: Variable) !*Variable {
         const variable = try self.allocator.create(Variable);
-        if (node.* == parser.Node.FUNCTION_DEFINITION) {
-            variable.* = .{
-                .FUNCTION_DEFINITION = node,
-            };
-        } else {
-            const val = try self.get_expression_value(node);
-            variable.* = .{
-                .NUMBER = val,
-            };
-        }
-
+        variable.* = variable_value;
         return variable;
     }
 };

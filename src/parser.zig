@@ -56,6 +56,9 @@ pub const Node = union(NodeType) {
         NUMBER: struct {
             value: i64,
         },
+        BOOLEAN: struct {
+            value: bool,
+        },
         IDENTIFIER: struct {
             name: []const u8,
         },
@@ -237,7 +240,7 @@ pub const Parser = struct {
         return lhs;
     }
 
-    // PrimaryExpression ::= NUMBER | IDENTIFIER | FunctionCallStatement
+    // PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement
     fn parse_primary_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing primary expression\n", .{});
 
@@ -252,6 +255,11 @@ pub const Parser = struct {
                         .value = number_token,
                     },
                 },
+            }),
+            .BOOLEAN => |boolean_token| try self.create_node(.{
+                .PRIMARY_EXPRESSION = .{ .BOOLEAN = .{
+                    .value = boolean_token,
+                } },
             }),
             .IDENTIFIER => |identifier_token| try self.create_node(.{
                 .PRIMARY_EXPRESSION = .{

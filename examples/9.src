@@ -1,0 +1,10 @@
+let main = () => {
+	let i = true;
+
+	if i {
+		print(i);
+		return 1;
+	};
+
+	return 0;
+};
