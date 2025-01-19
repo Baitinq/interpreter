@@ -1,0 +1,13 @@
+let main = () => {
+	let counter = 0;
+
+	while !(counter == 10) {
+		print(counter);
+	};
+
+	while counter == 0 {
+		print(0);
+	};
+
+	return counter;
+};
