@@ -217,9 +217,16 @@ pub const Parser = struct {
         } });
     }
 
-    // Expression ::= EqualityExpression | AdditiveExpression | FunctionDefinition
+    // Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition | LPAREN Expression RPAREN
     fn parse_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing expression\n", .{});
+
+        if (self.accept_token(tokenizer.TokenType.LPAREN)) |_| {
+            const expr = try self.parse_expression();
+            _ = try self.parse_token(tokenizer.TokenType.RPAREN);
+            std.debug.print("HERE!\n", .{});
+            return expr;
+        }
 
         return self.accept_parse(parse_equality_expression) orelse
             self.accept_parse(parse_additive_expression) orelse

@@ -12,7 +12,7 @@ ReturnStatement ::= RETURN Expression
 
 FunctionArguments ::= Expression ("," Expression)*
 
-Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition
+Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition | LPAREN Expression RPAREN
 
 EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
 
