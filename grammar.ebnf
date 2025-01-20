@@ -12,13 +12,13 @@ ReturnStatement ::= RETURN Expression
 
 FunctionArguments ::= Expression ("," Expression)*
 
-Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition | LPAREN Expression RPAREN
+Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition
 
 EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
 
 AdditiveExpression ::= PrimaryExpression (("+" | "-") PrimaryExpression)*
 
-PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement
+PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | LPAREN Expression RPAREN
 
 FunctionDefinition ::= LPAREN FunctionParamters? RPAREN ARROW LBRACE Statement* ReturnStatement SEMICOLON RBRACE
 
