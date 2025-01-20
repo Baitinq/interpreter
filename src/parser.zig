@@ -251,17 +251,21 @@ pub const Parser = struct {
         } });
     }
 
-    // AdditiveExpression ::= PrimaryExpression (("+" | "-") AdditiveExpression)?
+    // AdditiveExpression ::= PrimaryExpression (("+" | "-") PrimaryExpression)*
     fn parse_additive_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
 
-        const lhs = try self.parse_primary_expression();
+        var lhs = try self.parse_primary_expression();
 
-        const plus = self.accept_token(tokenizer.TokenType.PLUS);
-        const minus = self.accept_token(tokenizer.TokenType.MINUS);
-        if (plus != null or minus != null) {
-            const rhs = try self.parse_additive_expression();
-            return self.create_node(.{ .ADDITIVE_EXPRESSION = .{
+        while (true) {
+            const plus = self.accept_token(tokenizer.TokenType.PLUS);
+            const minus = self.accept_token(tokenizer.TokenType.MINUS);
+
+            if (plus == null and minus == null) break;
+
+            const rhs = try self.parse_primary_expression();
+
+            lhs = try self.create_node(.{ .ADDITIVE_EXPRESSION = .{
                 .addition = plus != null,
                 .lhs = lhs,
                 .rhs = rhs,

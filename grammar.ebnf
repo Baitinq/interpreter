@@ -16,7 +16,7 @@ Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition | 
 
 EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
 
-AdditiveExpression ::= PrimaryExpression (("+" | "-") AdditiveExpression)?
+AdditiveExpression ::= PrimaryExpression (("+" | "-") PrimaryExpression)*
 
 PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement
 
