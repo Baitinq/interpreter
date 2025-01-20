@@ -16,7 +16,9 @@ Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition
 
 EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
 
-AdditiveExpression ::= PrimaryExpression (("+" | "-") PrimaryExpression)*
+AdditiveExpression ::= UnaryExpression (("+" | "-") UnaryExpression)*
+
+UnaryExpression ::= "!" UnaryExpression | PrimaryExpression
 
 PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | LPAREN Expression RPAREN
 

@@ -1,7 +1,8 @@
 let main = () => {
 	let i = true;
+	i = !i;
 
-	if i {
+	if !i {
 		print(i);
 		return 1;
 	};

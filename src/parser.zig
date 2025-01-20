@@ -15,6 +15,7 @@ const NodeType = enum {
     EXPRESSION,
     EQUALITY_EXPRESSION,
     ADDITIVE_EXPRESSION,
+    UNARY_EXPRESSION,
     PRIMARY_EXPRESSION,
     FUNCTION_DEFINITION,
     RETURN_STATEMENT,
@@ -57,6 +58,10 @@ pub const Node = union(NodeType) {
         addition: bool,
         lhs: *Node,
         rhs: *Node,
+    },
+    UNARY_EXPRESSION: struct {
+        negation: bool,
+        expression: *Node,
     },
     PRIMARY_EXPRESSION: union(enum) {
         NUMBER: struct {
@@ -244,11 +249,11 @@ pub const Parser = struct {
         } });
     }
 
-    // AdditiveExpression ::= PrimaryExpression (("+" | "-") PrimaryExpression)*
+    // AdditiveExpression ::= UnaryExpression (("+" | "-") UnaryExpression)*
     fn parse_additive_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
 
-        var lhs = try self.parse_primary_expression();
+        var lhs = try self.parse_unary_expression();
 
         while (true) {
             const plus = self.accept_token(tokenizer.TokenType.PLUS);
@@ -256,7 +261,7 @@ pub const Parser = struct {
 
             if (plus == null and minus == null) break;
 
-            const rhs = try self.parse_primary_expression();
+            const rhs = try self.parse_unary_expression();
 
             lhs = try self.create_node(.{ .ADDITIVE_EXPRESSION = .{
                 .addition = plus != null,
@@ -266,6 +271,22 @@ pub const Parser = struct {
         }
 
         return lhs;
+    }
+
+    // UnaryExpression ::= "!" UnaryExpression | PrimaryExpression
+    fn parse_unary_expression(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing unary expression\n", .{});
+
+        const negation = self.accept_token(tokenizer.TokenType.NOT) != null;
+
+        if (!negation) {
+            return try self.parse_primary_expression();
+        }
+
+        return self.create_node(.{ .UNARY_EXPRESSION = .{
+            .negation = negation,
+            .expression = try self.parse_unary_expression(),
+        } });
     }
 
     // PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | LPAREN Expression RPAREN

@@ -144,6 +144,11 @@ pub const Evaluator = struct {
                 if (x.addition) return try self.create_variable(.{ .NUMBER = lhs.NUMBER + rhs.NUMBER });
                 return try self.create_variable(.{ .NUMBER = lhs.NUMBER - rhs.NUMBER });
             },
+            .UNARY_EXPRESSION => |x| {
+                const val = try self.get_expression_value(x.expression) orelse return EvaluatorError.EvaluationError;
+                std.debug.assert(val.* == .BOOLEAN);
+                return try self.create_variable(.{ .BOOLEAN = !val.BOOLEAN });
+            },
             .EQUALITY_EXPRESSION => |x| {
                 const lhs = try self.get_expression_value(x.lhs) orelse return EvaluatorError.EvaluationError;
                 const rhs = try self.get_expression_value(x.rhs) orelse return EvaluatorError.EvaluationError;
