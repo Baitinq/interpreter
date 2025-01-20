@@ -12,7 +12,6 @@ const NodeType = enum {
     ASSIGNMENT_STATEMENT,
     FUNCTION_CALL_STATEMENT,
     IF_STATEMENT,
-    EXPRESSION,
     EQUALITY_EXPRESSION,
     ADDITIVE_EXPRESSION,
     UNARY_EXPRESSION,
@@ -40,15 +39,6 @@ pub const Node = union(NodeType) {
     IF_STATEMENT: struct {
         condition: *Node,
         statements: []*Node,
-    },
-    EXPRESSION: union(enum) {
-        //TODO: Why do we need this
-        ADDITIVE_EXPRESSION: struct {
-            expression: *Node,
-        },
-        FUNCTION_DEFINITION: struct {
-            expression: *Node,
-        },
     },
     EQUALITY_EXPRESSION: struct {
         lhs: *Node,
