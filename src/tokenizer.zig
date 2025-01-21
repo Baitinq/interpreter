@@ -8,6 +8,7 @@ pub const TokenType = enum {
     // Keywords
     LET,
     IF,
+    WHILE,
     RETURN,
     ARROW,
 
@@ -36,6 +37,7 @@ pub const TokenType = enum {
 pub const Token = union(TokenType) {
     LET: void,
     IF: void,
+    WHILE: void,
     RETURN: void,
     ARROW: void,
     IDENTIFIER: []u8,
@@ -71,6 +73,13 @@ pub const Tokenizer = struct {
 
         const c = self.buf[self.offset];
 
+        if (self.accept_substr("let")) return Token{ .LET = void{} };
+        if (self.accept_substr("if")) return Token{ .IF = void{} };
+        if (self.accept_substr("while")) return Token{ .WHILE = void{} };
+        if (self.accept_substr("return")) return Token{ .RETURN = void{} };
+        if (self.accept_substr("true")) return Token{ .BOOLEAN = true };
+        if (self.accept_substr("false")) return Token{ .BOOLEAN = false };
+
         if (self.accept_substr("=>")) return Token{ .ARROW = void{} };
         if (c == ';') return Token{ .SEMICOLON = void{} };
         if (c == ',') return Token{ .COMMA = void{} };
@@ -85,12 +94,6 @@ pub const Tokenizer = struct {
 
         const string = self.consume_string();
         if (string.len == 0) return TokenizerError.TokenizingError;
-
-        if (std.mem.eql(u8, string, "let")) return Token{ .LET = void{} };
-        if (std.mem.eql(u8, string, "if")) return Token{ .IF = void{} };
-        if (std.mem.eql(u8, string, "return")) return Token{ .RETURN = void{} };
-        if (std.mem.eql(u8, string, "true")) return Token{ .BOOLEAN = true };
-        if (std.mem.eql(u8, string, "false")) return Token{ .BOOLEAN = false };
 
         if (std.fmt.parseInt(i32, string, 10) catch null) |i| return Token{ .NUMBER = i };
 

@@ -12,6 +12,7 @@ const NodeType = enum {
     ASSIGNMENT_STATEMENT,
     FUNCTION_CALL_STATEMENT,
     IF_STATEMENT,
+    WHILE_STATEMENT,
     EQUALITY_EXPRESSION,
     ADDITIVE_EXPRESSION,
     UNARY_EXPRESSION,
@@ -37,6 +38,10 @@ pub const Node = union(NodeType) {
         arguments: []*Node,
     },
     IF_STATEMENT: struct {
+        condition: *Node,
+        statements: []*Node,
+    },
+    WHILE_STATEMENT: struct {
         condition: *Node,
         statements: []*Node,
     },
@@ -111,12 +116,13 @@ pub const Parser = struct {
         } });
     }
 
-    // Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | ReturnStatement) SEMICOLON
+    // Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | WhileStatement | ReturnStatement) SEMICOLON
     fn parse_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing statement\n", .{});
 
         const statement = self.accept_parse(parse_function_call_statement) orelse
             self.accept_parse(parse_if_statement) orelse
+            self.accept_parse(parse_while_statement) orelse
             self.accept_parse(parse_return_statement) orelse
             try self.parse_assignment_statement();
 
@@ -212,6 +218,29 @@ pub const Parser = struct {
         } });
     }
 
+    // WhileStatement ::= "while" Expression LBRACE Statement* RBRACE
+    fn parse_while_statement(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing while statement\n", .{});
+
+        _ = try self.parse_token(tokenizer.TokenType.WHILE);
+
+        const expression = try self.parse_expression();
+
+        _ = try self.parse_token(tokenizer.TokenType.LBRACE);
+
+        var statements = std.ArrayList(*Node).init(self.allocator);
+        while (self.accept_parse(parse_statement)) |expr| {
+            try statements.append(expr);
+        }
+
+        _ = try self.parse_token(tokenizer.TokenType.RBRACE);
+
+        return try self.create_node(.{ .WHILE_STATEMENT = .{
+            .condition = expression,
+            .statements = statements.items,
+        } });
+    }
+
     // Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition
     fn parse_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing expression\n", .{});
@@ -286,7 +315,6 @@ pub const Parser = struct {
         if (self.accept_token(tokenizer.TokenType.LPAREN)) |_| {
             const expr = try self.parse_expression();
             _ = try self.parse_token(tokenizer.TokenType.RPAREN);
-            std.debug.print("HERE!\n", .{});
             return expr;
         }
 

@@ -62,6 +62,9 @@ pub const Evaluator = struct {
             .IF_STATEMENT => |*if_statement| {
                 return try self.evaluate_if_statement(@ptrCast(if_statement));
             },
+            .WHILE_STATEMENT => |*while_statement| {
+                return try self.evaluate_while_statement(@ptrCast(while_statement));
+            },
             .RETURN_STATEMENT => |*return_statement| return try self.evaluate_return_statement(@ptrCast(return_statement)),
             else => unreachable,
         }
@@ -120,6 +123,24 @@ pub const Evaluator = struct {
         if (!if_condition_val.?.BOOLEAN) return null;
 
         if (try self.evaluate_block_statements(if_statement.statements)) |ret| return ret;
+
+        return null;
+    }
+
+    fn evaluate_while_statement(self: *Evaluator, node: *parser.Node) !?*Variable {
+        errdefer std.debug.print("Error evaluating while statement\n", .{});
+        std.debug.assert(node.* == parser.Node.WHILE_STATEMENT);
+
+        const while_statement = node.WHILE_STATEMENT;
+
+        while (true) {
+            const while_condition_val = try self.get_expression_value(while_statement.condition);
+            std.debug.assert(while_condition_val.?.* == .BOOLEAN);
+
+            if (!while_condition_val.?.BOOLEAN) return null;
+
+            if (try self.evaluate_block_statements(while_statement.statements)) |ret| return ret;
+        }
 
         return null;
     }

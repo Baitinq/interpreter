@@ -1,12 +1,14 @@
 Program      ::= Statement+
 
-Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | ReturnStatement) SEMICOLON
+Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | WhileStatement | ReturnStatement) SEMICOLON
 
 AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
 
 FunctionCallStatement ::= IDENTIFIER LPAREN FunctionArguments? RPAREN
 
 IfStatement ::= "if" Expression LBRACE Statement* RBRACE -- TODO: Should function definitions be allowed?
+
+WhileStatement ::= "while" Expression LBRACE Statement* RBRACE
 
 ReturnStatement ::= RETURN Expression
 
