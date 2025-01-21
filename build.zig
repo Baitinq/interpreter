@@ -3,7 +3,7 @@ const std = @import("std");
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -83,4 +83,26 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    // Example step - used for testing againt all the example programs
+    const examples_step = b.step("examples", "Run examples");
+    examples_step.dependOn(&exe.step);
+
+    const examples_dir = "examples";
+    var dir = std.fs.cwd().openDir(examples_dir, .{ .iterate = true }) catch |err| {
+        std.debug.print("Failed to open examples directory: {}\n", .{err});
+        return;
+    };
+    defer dir.close();
+
+    var iter = dir.iterate();
+    while (try iter.next()) |entry| {
+        if (entry.kind == .file) {
+            const example_path = b.fmt("{s}/{s}", .{ examples_dir, entry.name });
+            const run_example = b.addSystemCommand(&.{ "zig", "build", "run", "--", example_path });
+            run_example.setName(b.fmt("{s}", .{example_path}));
+            run_example.expectExitCode(0);
+            examples_step.dependOn(&run_example.step);
+        }
+    }
 }
