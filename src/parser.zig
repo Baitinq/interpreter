@@ -217,8 +217,8 @@ pub const Parser = struct {
         errdefer if (!self.try_context) std.debug.print("Error parsing expression\n", .{});
 
         return self.accept_parse(parse_equality_expression) orelse
-            self.accept_parse(parse_additive_expression) orelse
             self.accept_parse(parse_function_definition) orelse
+            self.accept_parse(parse_additive_expression) orelse
             return ParserError.ParsingError;
     }
 
