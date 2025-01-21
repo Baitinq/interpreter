@@ -15,6 +15,7 @@ const NodeType = enum {
     WHILE_STATEMENT,
     EQUALITY_EXPRESSION,
     ADDITIVE_EXPRESSION,
+    MULTIPLICATIVE_EXPRESSION,
     UNARY_EXPRESSION,
     PRIMARY_EXPRESSION,
     FUNCTION_DEFINITION,
@@ -51,6 +52,11 @@ pub const Node = union(NodeType) {
     },
     ADDITIVE_EXPRESSION: struct {
         addition: bool,
+        lhs: *Node,
+        rhs: *Node,
+    },
+    MULTIPLICATIVE_EXPRESSION: struct {
+        multiplication: bool,
         lhs: *Node,
         rhs: *Node,
     },
@@ -268,11 +274,11 @@ pub const Parser = struct {
         } });
     }
 
-    // AdditiveExpression ::= UnaryExpression (("+" | "-") UnaryExpression)*
+    // AdditiveExpression ::= MultiplicativeExpression (("+" | "-") MultiplicativeExpression)*
     fn parse_additive_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
 
-        var lhs = try self.parse_unary_expression();
+        var lhs = try self.parse_multiplicative_expression();
 
         while (true) {
             const plus = self.accept_token(tokenizer.TokenType.PLUS);
@@ -280,10 +286,34 @@ pub const Parser = struct {
 
             if (plus == null and minus == null) break;
 
-            const rhs = try self.parse_unary_expression();
+            const rhs = try self.parse_multiplicative_expression();
 
             lhs = try self.create_node(.{ .ADDITIVE_EXPRESSION = .{
                 .addition = plus != null,
+                .lhs = lhs,
+                .rhs = rhs,
+            } });
+        }
+
+        return lhs;
+    }
+
+    // MultiplicativeExpression ::= UnaryExpression (("*" | "/") UnaryExpression)*
+    fn parse_multiplicative_expression(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
+
+        var lhs = try self.parse_unary_expression();
+
+        while (true) {
+            const mul = self.accept_token(tokenizer.TokenType.MUL);
+            const div = self.accept_token(tokenizer.TokenType.DIV);
+
+            if (mul == null and div == null) break;
+
+            const rhs = try self.parse_unary_expression();
+
+            lhs = try self.create_node(.{ .MULTIPLICATIVE_EXPRESSION = .{
+                .multiplication = mul != null,
                 .lhs = lhs,
                 .rhs = rhs,
             } });

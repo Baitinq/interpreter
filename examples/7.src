@@ -1,7 +1,7 @@
 let main = () => {
 	let i = 4;
 	
-	if (i - 1) == 5 - (1 + 1) {
+	if (1 - 1 * 2) == 5 - (10 / 2) - 1 {
 		print(i);
 		return i;
 	};

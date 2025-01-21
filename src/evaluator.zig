@@ -165,6 +165,13 @@ pub const Evaluator = struct {
                 if (x.addition) return try self.create_variable(.{ .NUMBER = lhs.NUMBER + rhs.NUMBER });
                 return try self.create_variable(.{ .NUMBER = lhs.NUMBER - rhs.NUMBER });
             },
+            .MULTIPLICATIVE_EXPRESSION => |x| {
+                const lhs = try self.get_expression_value(x.lhs) orelse return EvaluatorError.EvaluationError;
+                const rhs = try self.get_expression_value(x.rhs) orelse return EvaluatorError.EvaluationError;
+                std.debug.assert(lhs.* == .NUMBER and rhs.* == .NUMBER);
+                if (x.multiplication) return try self.create_variable(.{ .NUMBER = lhs.NUMBER * rhs.NUMBER });
+                return try self.create_variable(.{ .NUMBER = @divFloor(lhs.NUMBER, rhs.NUMBER) });
+            },
             .UNARY_EXPRESSION => |x| {
                 const val = try self.get_expression_value(x.expression) orelse return EvaluatorError.EvaluationError;
                 std.debug.assert(val.* == .BOOLEAN);

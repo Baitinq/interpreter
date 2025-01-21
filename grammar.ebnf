@@ -18,7 +18,9 @@ Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition
 
 EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
 
-AdditiveExpression ::= UnaryExpression (("+" | "-") UnaryExpression)*
+AdditiveExpression ::= MultiplicativeExpression (("+" | "-") MultiplicativeExpression)*
+
+MultiplicativeExpression ::= UnaryExpression (("*" | "/") UnaryExpression)*
 
 UnaryExpression ::= "!" UnaryExpression | PrimaryExpression
 
