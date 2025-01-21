@@ -22,7 +22,7 @@ AdditiveExpression ::= MultiplicativeExpression (("+" | "-") MultiplicativeExpre
 
 MultiplicativeExpression ::= UnaryExpression (("*" | "/") UnaryExpression)*
 
-UnaryExpression ::= "!" UnaryExpression | PrimaryExpression
+UnaryExpression ::= ("!" | "-") UnaryExpression | PrimaryExpression
 
 PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | LPAREN Expression RPAREN
 

@@ -174,6 +174,10 @@ pub const Evaluator = struct {
             },
             .UNARY_EXPRESSION => |x| {
                 const val = try self.get_expression_value(x.expression) orelse return EvaluatorError.EvaluationError;
+                if (!x.negation) {
+                    std.debug.assert(val.* == .NUMBER);
+                    return try self.create_variable(.{ .NUMBER = -val.NUMBER });
+                }
                 std.debug.assert(val.* == .BOOLEAN);
                 return try self.create_variable(.{ .BOOLEAN = !val.BOOLEAN });
             },
@@ -268,7 +272,6 @@ const Environment = struct {
             .allocator = allocator,
         };
 
-        //TODO: Add more scopes when evaluating functions
         // Create global scope
         try self.create_scope();
 

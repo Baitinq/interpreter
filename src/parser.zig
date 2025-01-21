@@ -322,18 +322,19 @@ pub const Parser = struct {
         return lhs;
     }
 
-    // UnaryExpression ::= "!" UnaryExpression | PrimaryExpression
+    // UnaryExpression ::= ("!" | "-") UnaryExpression | PrimaryExpression
     fn parse_unary_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing unary expression\n", .{});
 
-        const negation = self.accept_token(tokenizer.TokenType.BANG) != null;
+        const not = self.accept_token(tokenizer.TokenType.BANG) != null;
+        const minus = self.accept_token(tokenizer.TokenType.MINUS) != null;
 
-        if (!negation) {
+        if (!not and !minus) {
             return try self.parse_primary_expression();
         }
 
         return self.create_node(.{ .UNARY_EXPRESSION = .{
-            .negation = negation,
+            .negation = not,
             .expression = try self.parse_unary_expression(),
         } });
     }
