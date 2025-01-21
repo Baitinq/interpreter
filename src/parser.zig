@@ -267,7 +267,7 @@ pub const Parser = struct {
     fn parse_unary_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing unary expression\n", .{});
 
-        const negation = self.accept_token(tokenizer.TokenType.NOT) != null;
+        const negation = self.accept_token(tokenizer.TokenType.BANG) != null;
 
         if (!negation) {
             return try self.parse_primary_expression();
