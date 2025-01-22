@@ -6,23 +6,7 @@ const ParserError = error{
     OutOfMemory,
 };
 
-const NodeType = enum {
-    PROGRAM,
-    STATEMENT,
-    ASSIGNMENT_STATEMENT,
-    FUNCTION_CALL_STATEMENT,
-    IF_STATEMENT,
-    WHILE_STATEMENT,
-    EQUALITY_EXPRESSION,
-    ADDITIVE_EXPRESSION,
-    MULTIPLICATIVE_EXPRESSION,
-    UNARY_EXPRESSION,
-    PRIMARY_EXPRESSION,
-    FUNCTION_DEFINITION,
-    RETURN_STATEMENT,
-};
-
-pub const Node = union(NodeType) {
+pub const Node = union(enum) {
     PROGRAM: struct {
         statements: []*Node,
     },
@@ -159,7 +143,7 @@ pub const Parser = struct {
         return self.create_node(.{
             .ASSIGNMENT_STATEMENT = .{
                 .is_declaration = is_declaration,
-                .name = try self.allocator.dupe(u8, identifier.IDENTIFIER),
+                .name = try self.allocator.dupe(u8, identifier.type.IDENTIFIER),
                 .expression = @constCast(expression),
             },
         });
@@ -178,7 +162,7 @@ pub const Parser = struct {
         _ = try self.parse_token(tokenizer.TokenType.RPAREN);
 
         return self.create_node(.{ .FUNCTION_CALL_STATEMENT = .{
-            .name = try self.allocator.dupe(u8, identifier.IDENTIFIER),
+            .name = try self.allocator.dupe(u8, identifier.type.IDENTIFIER),
             .arguments = arguments,
         } });
     }
@@ -353,7 +337,7 @@ pub const Parser = struct {
 
         const token = self.consume_token() orelse return ParserError.ParsingError;
 
-        return switch (token) {
+        return switch (token.type) {
             .NUMBER => |number_token| try self.create_node(.{
                 .PRIMARY_EXPRESSION = .{
                     .NUMBER = .{
@@ -421,7 +405,7 @@ pub const Parser = struct {
             try node_list.append(try self.create_node(.{
                 .PRIMARY_EXPRESSION = .{
                     .IDENTIFIER = .{
-                        .name = try self.allocator.dupe(u8, ident.IDENTIFIER),
+                        .name = try self.allocator.dupe(u8, ident.type.IDENTIFIER),
                     },
                 },
             }));
@@ -444,11 +428,11 @@ pub const Parser = struct {
         });
     }
 
-    fn parse_token(self: *Parser, expected_token: tokenizer.TokenType) ParserError!tokenizer.Token {
+    fn parse_token(self: *Parser, expected_token: std.meta.Tag(tokenizer.TokenType)) ParserError!tokenizer.Token {
         errdefer if (!self.try_context) std.debug.print("Error accepting token: {any}\n", .{expected_token});
         const token = self.peek_token() orelse return ParserError.ParsingError;
 
-        if (token != expected_token) {
+        if (expected_token != std.meta.activeTag(token.type)) {
             if (!self.try_context) std.debug.print("Expected {any} - found {any}\n", .{ expected_token, token });
             return ParserError.ParsingError;
         }
@@ -469,9 +453,9 @@ pub const Parser = struct {
         return node;
     }
 
-    fn accept_token(self: *Parser, token: tokenizer.TokenType) ?tokenizer.Token {
+    fn accept_token(self: *Parser, token_type: std.meta.Tag(tokenizer.TokenType)) ?tokenizer.Token {
         const curr_token = self.peek_token() orelse return null;
-        if (curr_token == token) {
+        if (std.meta.activeTag(curr_token.type) == token_type) {
             return self.consume_token();
         }
         return null;

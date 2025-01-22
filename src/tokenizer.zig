@@ -4,59 +4,44 @@ const TokenizerError = error{
     TokenizingError,
 };
 
-pub const TokenType = enum {
+pub const TokenType = union(enum) {
     // Keywords
-    LET,
-    IF,
-    WHILE,
-    RETURN,
-    ARROW,
-
-    // Identifiers
-    IDENTIFIER,
-
-    // Literals
-    NUMBER,
-    BOOLEAN,
-
-    // Operators
-    EQUALS,
-    PLUS,
-    MINUS,
-    MUL,
-    DIV,
-    BANG,
-
-    // Punctuation
-    SEMICOLON,
-    COMMA,
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
-};
-
-pub const Token = union(TokenType) {
     LET: void,
     IF: void,
     WHILE: void,
     RETURN: void,
     ARROW: void,
+
+    // Identifiers
     IDENTIFIER: []u8,
+
+    // Literals
     NUMBER: i64,
     BOOLEAN: bool,
+
+    // Operators
     EQUALS: void,
     PLUS: void,
     MINUS: void,
     MUL: void,
     DIV: void,
     BANG: void,
+
+    // Punctuation
     SEMICOLON: void,
     COMMA: void,
     LPAREN: void,
     RPAREN: void,
     LBRACE: void,
     RBRACE: void,
+};
+
+pub const Token = struct {
+    //TODO: Add source code info
+    col: u64,
+    row: u64,
+
+    type: TokenType,
 };
 
 pub const Tokenizer = struct {
@@ -77,33 +62,33 @@ pub const Tokenizer = struct {
 
         const c = self.buf[self.offset];
 
-        if (self.accept_substr("let")) return Token{ .LET = void{} };
-        if (self.accept_substr("if")) return Token{ .IF = void{} };
-        if (self.accept_substr("while")) return Token{ .WHILE = void{} };
-        if (self.accept_substr("return")) return Token{ .RETURN = void{} };
-        if (self.accept_substr("true")) return Token{ .BOOLEAN = true };
-        if (self.accept_substr("false")) return Token{ .BOOLEAN = false };
+        if (self.accept_substr("let")) return self.create_token(.{ .LET = void{} });
+        if (self.accept_substr("if")) return self.create_token(.{ .IF = void{} });
+        if (self.accept_substr("while")) return self.create_token(.{ .WHILE = void{} });
+        if (self.accept_substr("return")) return self.create_token(.{ .RETURN = void{} });
+        if (self.accept_substr("true")) return self.create_token(.{ .BOOLEAN = true });
+        if (self.accept_substr("false")) return self.create_token(.{ .BOOLEAN = false });
 
-        if (self.accept_substr("=>")) return Token{ .ARROW = void{} };
-        if (c == ';') return Token{ .SEMICOLON = void{} };
-        if (c == ',') return Token{ .COMMA = void{} };
-        if (c == '(') return Token{ .LPAREN = void{} };
-        if (c == ')') return Token{ .RPAREN = void{} };
-        if (c == '{') return Token{ .LBRACE = void{} };
-        if (c == '}') return Token{ .RBRACE = void{} };
-        if (c == '=') return Token{ .EQUALS = void{} };
-        if (c == '+') return Token{ .PLUS = void{} };
-        if (c == '-') return Token{ .MINUS = void{} };
-        if (c == '*') return Token{ .MUL = void{} };
-        if (c == '/') return Token{ .DIV = void{} };
-        if (c == '!') return Token{ .BANG = void{} };
+        if (self.accept_substr("=>")) return self.create_token(.{ .ARROW = void{} });
+        if (c == ';') return self.create_token(.{ .SEMICOLON = void{} });
+        if (c == ',') return self.create_token(.{ .COMMA = void{} });
+        if (c == '(') return self.create_token(.{ .LPAREN = void{} });
+        if (c == ')') return self.create_token(.{ .RPAREN = void{} });
+        if (c == '{') return self.create_token(.{ .LBRACE = void{} });
+        if (c == '}') return self.create_token(.{ .RBRACE = void{} });
+        if (c == '=') return self.create_token(.{ .EQUALS = void{} });
+        if (c == '+') return self.create_token(.{ .PLUS = void{} });
+        if (c == '-') return self.create_token(.{ .MINUS = void{} });
+        if (c == '*') return self.create_token(.{ .MUL = void{} });
+        if (c == '/') return self.create_token(.{ .DIV = void{} });
+        if (c == '!') return self.create_token(.{ .BANG = void{} });
 
         const string = self.consume_string();
         if (string.len == 0) return TokenizerError.TokenizingError;
 
-        if (std.fmt.parseInt(i32, string, 10) catch null) |i| return Token{ .NUMBER = i };
+        if (std.fmt.parseInt(i32, string, 10) catch null) |i| return self.create_token(.{ .NUMBER = i });
 
-        return Token{ .IDENTIFIER = string };
+        return self.create_token(.{ .IDENTIFIER = string });
     }
 
     fn skip_comments(self: *Tokenizer) void {
@@ -144,6 +129,14 @@ pub const Tokenizer = struct {
             return true;
         }
         return false;
+    }
+
+    fn create_token(self: *Tokenizer, token_type: TokenType) Token {
+        return Token{
+            .col = self.offset,
+            .row = self.offset,
+            .type = token_type,
+        };
     }
 };
 
