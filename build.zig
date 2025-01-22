@@ -102,6 +102,7 @@ pub fn build(b: *std.Build) !void {
             const run_example = b.addSystemCommand(&.{ "zig", "build", "run", "--", example_path });
             run_example.setName(b.fmt("{s}", .{example_path}));
             run_example.expectExitCode(0);
+            run_example.has_side_effects = true;
             examples_step.dependOn(&run_example.step);
         }
     }
