@@ -1,5 +1,7 @@
 let ten = () => {
-	return 10;
+	return () => {
+		return 10;
+	}();
 };
 
 let main = () => {
