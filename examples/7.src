@@ -1,7 +1,11 @@
+let ten = () => {
+	return 10;
+};
+
 let main = () => {
 	let i = 4;
 	
-	if (1 - -1 * 2) == 5 - (10 / 2) + 3 {
+	if (1 - -1 * 2) == 5 - (-1 + 1 + ten() / 2) + 3 {
 		print(i);
 		return i;
 	};
