@@ -36,11 +36,14 @@ pub const TokenType = union(enum) {
     RBRACE: void,
 };
 
-pub const Token = struct {
-    //TODO: Add source code info
+const TokenLocation = struct {
     col: u64,
     row: u64,
+};
 
+pub const Token = struct {
+    location: TokenLocation,
+    offset: u64,
     type: TokenType,
 };
 
@@ -129,10 +132,30 @@ pub const Tokenizer = struct {
 
     fn create_token(self: *Tokenizer, token_type: TokenType) Token {
         return Token{
-            .col = self.offset,
-            .row = self.offset,
+            .location = self.compute_location(),
+            .offset = self.offset - 1,
             .type = token_type,
         };
+    }
+
+    fn compute_location(self: *Tokenizer) TokenLocation {
+        var location = TokenLocation{ .col = 1, .row = 1 };
+
+        var i: usize = 0;
+        while (i < self.offset) : (i += 1) {
+            if (self.buf[i] == '\n') {
+                location.row += 1;
+                location.col = 1;
+            } else {
+                location.col += 1;
+            }
+        }
+
+        // We need to do this because we call this fn after we consume the token
+        location.row -= 1;
+        location.col -= 1;
+
+        return location;
     }
 };
 
