@@ -381,7 +381,7 @@ pub const Parser = struct {
             try nodes.append(expression);
         }
 
-        if (nodes.getLast().STATEMENT.statement.* != .RETURN_STATEMENT) return ParserError.ParsingError;
+        if (nodes.items.len == 0 or nodes.getLast().STATEMENT.statement.* != .RETURN_STATEMENT) return ParserError.ParsingError;
 
         _ = try self.parse_token(tokenizer.TokenType.RBRACE);
 
