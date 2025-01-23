@@ -2,6 +2,7 @@ const std = @import("std");
 const tokenizer = @import("tokenizer.zig");
 const parser = @import("parser.zig");
 const evaluator = @import("evaluator.zig");
+const codegen = @import("codegen.zig");
 
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
@@ -21,6 +22,8 @@ pub fn main() !void {
     defer arena.deinit();
 
     const source_evaluator = try evaluator.Evaluator.init(arena.allocator());
+
+    codegen.CodeGen.generate();
 
     if (std.mem.eql(u8, path, "-i")) {
         while (true) {
