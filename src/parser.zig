@@ -108,7 +108,7 @@ pub const Parser = struct {
 
     // Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | WhileStatement | ReturnStatement) SEMICOLON
     fn parse_statement(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing statement\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing statement {any}\n", .{self.peek_token()});
 
         const statement = self.accept_parse(parse_function_call_statement) orelse
             self.accept_parse(parse_if_statement) orelse
@@ -127,7 +127,7 @@ pub const Parser = struct {
 
     // AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
     fn parse_assignment_statement(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing assignment statement\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing assignment statement {any}\n", .{self.peek_token()});
 
         var is_declaration: bool = false;
         if (self.accept_token(.LET) != null) {
@@ -151,7 +151,7 @@ pub const Parser = struct {
 
     // FunctionCallStatement ::= IDENTIFIER LPAREN FunctionArguments? RPAREN
     fn parse_function_call_statement(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing function call statement\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing function call statement {any}\n", .{self.peek_token()});
 
         const identifier = try self.parse_token(tokenizer.TokenType.IDENTIFIER);
 
@@ -169,7 +169,8 @@ pub const Parser = struct {
 
     // FunctionArguments ::= Expression ("," Expression)*
     fn parse_function_arguments(self: *Parser) ParserError![]*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing function arguments\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing function arguments {any}\n", .{self.peek_token()});
+
         var node_list = std.ArrayList(*Node).init(self.arena);
 
         var first = true;
@@ -187,7 +188,7 @@ pub const Parser = struct {
 
     // IfStatement ::= "if" Expression LBRACE Statement* RBRACE
     fn parse_if_statement(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing if statement\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing if statement {any}\n", .{self.peek_token()});
 
         _ = try self.parse_token(tokenizer.TokenType.IF);
 
@@ -210,7 +211,7 @@ pub const Parser = struct {
 
     // WhileStatement ::= "while" Expression LBRACE Statement* RBRACE
     fn parse_while_statement(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing while statement\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing while statement {any}\n", .{self.peek_token()});
 
         _ = try self.parse_token(tokenizer.TokenType.WHILE);
 
@@ -233,7 +234,7 @@ pub const Parser = struct {
 
     // Expression   ::= EqualityExpression | AdditiveExpression
     fn parse_expression(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing expression\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing expression {any}\n", .{self.peek_token()});
 
         return self.accept_parse(parse_equality_expression) orelse
             self.accept_parse(parse_additive_expression) orelse
@@ -242,7 +243,7 @@ pub const Parser = struct {
 
     // EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
     fn parse_equality_expression(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing equality expression\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing equality expression {any}\n", .{self.peek_token()});
 
         const lhs = try self.parse_additive_expression();
 
@@ -259,7 +260,7 @@ pub const Parser = struct {
 
     // AdditiveExpression ::= MultiplicativeExpression (("+" | "-") MultiplicativeExpression)*
     fn parse_additive_expression(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing additive expression {any}\n", .{self.peek_token()});
 
         var lhs = try self.parse_multiplicative_expression();
 
@@ -283,7 +284,7 @@ pub const Parser = struct {
 
     // MultiplicativeExpression ::= UnaryExpression (("*" | "/") UnaryExpression)*
     fn parse_multiplicative_expression(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing additive expression\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing additive expression {any}\n", .{self.peek_token()});
 
         var lhs = try self.parse_unary_expression();
 
@@ -307,7 +308,7 @@ pub const Parser = struct {
 
     // UnaryExpression ::= ("!" | "-") UnaryExpression | PrimaryExpression
     fn parse_unary_expression(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing unary expression\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing unary expression {any}\n", .{self.peek_token()});
 
         const not = self.accept_token(tokenizer.TokenType.BANG) != null;
         const minus = self.accept_token(tokenizer.TokenType.MINUS) != null;
@@ -324,7 +325,7 @@ pub const Parser = struct {
 
     // PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | FunctionDefinition | LPAREN Expression RPAREN
     fn parse_primary_expression(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing primary expression\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing primary expression {any}\n", .{self.peek_token()});
 
         if (self.accept_parse(parse_function_definition)) |stmt| return stmt;
         if (self.accept_parse(parse_function_call_statement)) |stmt| return stmt;
@@ -364,7 +365,7 @@ pub const Parser = struct {
 
     // FunctionDefinition ::= LPAREN FunctionParamters? RPAREN ARROW LBRACE Statement* ReturnStatement RBRACE
     fn parse_function_definition(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing function definition\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing function definition {any}\n", .{self.peek_token()});
 
         _ = try self.parse_token(tokenizer.TokenType.LPAREN);
 
@@ -392,7 +393,8 @@ pub const Parser = struct {
 
     // FunctionParameters ::= IDENTIFIER ("," IDENTIFIER)*
     fn parse_function_parameters(self: *Parser) ParserError![]*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing function parameters\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing function parameters {any}\n", .{self.peek_token()});
+
         var node_list = std.ArrayList(*Node).init(self.arena);
 
         var first = true;
@@ -417,7 +419,8 @@ pub const Parser = struct {
 
     // ReturnStatement ::= RETURN Expression
     fn parse_return_statement(self: *Parser) ParserError!*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing return statement\n", .{});
+        errdefer if (!self.try_context) std.debug.print("Error parsing return statement {any}\n", .{self.peek_token()});
+
         _ = try self.parse_token(tokenizer.TokenType.RETURN);
 
         const expression = try self.parse_expression();
