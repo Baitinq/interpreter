@@ -1,0 +1,12 @@
+let main = () => {
+	let x = (a) => {
+		print(a);
+		return 1;
+	};
+
+	let y = (f) => {
+		return f(2);
+	};
+
+	return y(x);
+};
