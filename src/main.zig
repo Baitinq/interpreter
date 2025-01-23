@@ -20,7 +20,7 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    const source_evaluator = try evaluator.Evaluator.init(&arena);
+    const source_evaluator = try evaluator.Evaluator.init(arena.allocator());
 
     if (std.mem.eql(u8, path, "-i")) {
         while (true) {
@@ -29,7 +29,7 @@ pub fn main() !void {
             const buf = try stdin.readUntilDelimiterAlloc(allocator, '\n', 1024);
             defer allocator.free(buf);
 
-            process_buf(buf, allocator, &arena, source_evaluator) catch |err| {
+            process_buf(buf, allocator, arena.allocator(), source_evaluator) catch |err| {
                 try stdout.print("Error processing line: {any}\n", .{err});
             };
         }
@@ -38,11 +38,11 @@ pub fn main() !void {
         const file = try std.fs.cwd().openFile(path, .{});
         const buf = try file.readToEndAlloc(allocator, 1 * 1024 * 1024);
         defer allocator.free(buf);
-        try process_buf(buf, allocator, &arena, source_evaluator);
+        try process_buf(buf, allocator, arena.allocator(), source_evaluator);
     }
 }
 
-fn process_buf(buf: []u8, allocator: std.mem.Allocator, arena: *std.heap.ArenaAllocator, source_evaluator: *evaluator.Evaluator) !void {
+fn process_buf(buf: []u8, allocator: std.mem.Allocator, arena: std.mem.Allocator, source_evaluator: *evaluator.Evaluator) !void {
     std.debug.print("Buf:\n{s}\n", .{buf});
 
     var token_list = std.ArrayList(tokenizer.Token).init(allocator);

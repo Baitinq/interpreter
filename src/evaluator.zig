@@ -18,15 +18,14 @@ pub const Evaluator = struct {
     ast: ?*parser.Node,
     environment: *Environment,
 
-    allocator: std.mem.Allocator,
+    arena: std.mem.Allocator,
 
-    pub fn init(arena_allocator: *std.heap.ArenaAllocator) !*Evaluator {
-        const allocator = arena_allocator.allocator();
-        const evaluator = try allocator.create(Evaluator);
+    pub fn init(arena_allocator: std.mem.Allocator) !*Evaluator {
+        const evaluator = try arena_allocator.create(Evaluator);
         evaluator.* = .{
             .ast = null,
             .environment = try Environment.init(arena_allocator),
-            .allocator = allocator,
+            .arena = arena_allocator,
         };
         return evaluator;
     }
@@ -248,7 +247,7 @@ pub const Evaluator = struct {
     }
 
     fn create_variable(self: *Evaluator, variable_value: Variable) !*Variable {
-        const variable = try self.allocator.create(Variable);
+        const variable = try self.arena.create(Variable);
         variable.* = variable_value;
         return variable;
     }
@@ -261,15 +260,14 @@ const Scope = struct {
 const Environment = struct {
     scope_stack: std.ArrayList(*Scope),
 
-    allocator: std.mem.Allocator,
+    arena: std.mem.Allocator,
 
-    fn init(arena_allocator: *std.heap.ArenaAllocator) !*Environment {
-        const allocator = arena_allocator.allocator();
-        const self = try allocator.create(Environment);
+    fn init(arena_allocator: std.mem.Allocator) !*Environment {
+        const self = try arena_allocator.create(Environment);
 
         self.* = .{
-            .scope_stack = std.ArrayList(*Scope).init(allocator),
-            .allocator = allocator,
+            .scope_stack = std.ArrayList(*Scope).init(arena_allocator),
+            .arena = arena_allocator,
         };
 
         // Create global scope
@@ -279,9 +277,9 @@ const Environment = struct {
     }
 
     fn create_scope(self: *Environment) !void {
-        const scope = try self.allocator.create(Scope);
+        const scope = try self.arena.create(Scope);
         scope.* = .{
-            .variables = std.StringHashMap(?*Variable).init(self.allocator),
+            .variables = std.StringHashMap(?*Variable).init(self.arena),
         };
         try self.scope_stack.append(scope);
     }

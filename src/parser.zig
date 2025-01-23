@@ -75,16 +75,16 @@ pub const Parser = struct {
     tokens: []tokenizer.Token,
     offset: u32,
 
-    allocator: std.mem.Allocator,
+    arena: std.mem.Allocator,
 
     try_context: bool, //TODO: I dont like this
 
-    pub fn init(tokens: []tokenizer.Token, arena_allocator: *std.heap.ArenaAllocator) ParserError!*Parser {
-        const parser = try arena_allocator.allocator().create(Parser);
+    pub fn init(tokens: []tokenizer.Token, arena_allocator: std.mem.Allocator) ParserError!*Parser {
+        const parser = try arena_allocator.create(Parser);
         parser.* = .{
             .tokens = tokens,
             .offset = 0,
-            .allocator = arena_allocator.allocator(),
+            .arena = arena_allocator,
             .try_context = false,
         };
         return parser;
@@ -96,7 +96,7 @@ pub const Parser = struct {
 
     // Program ::= Statement+
     fn parse_program(self: *Parser) !*Node {
-        var nodes = std.ArrayList(*Node).init(self.allocator);
+        var nodes = std.ArrayList(*Node).init(self.arena);
         while (self.offset < self.tokens.len) {
             try nodes.append(@constCast(try self.parse_statement()));
         }
@@ -143,7 +143,7 @@ pub const Parser = struct {
         return self.create_node(.{
             .ASSIGNMENT_STATEMENT = .{
                 .is_declaration = is_declaration,
-                .name = try self.allocator.dupe(u8, identifier.type.IDENTIFIER),
+                .name = try self.arena.dupe(u8, identifier.type.IDENTIFIER),
                 .expression = @constCast(expression),
             },
         });
@@ -162,7 +162,7 @@ pub const Parser = struct {
         _ = try self.parse_token(tokenizer.TokenType.RPAREN);
 
         return self.create_node(.{ .FUNCTION_CALL_STATEMENT = .{
-            .name = try self.allocator.dupe(u8, identifier.type.IDENTIFIER),
+            .name = try self.arena.dupe(u8, identifier.type.IDENTIFIER),
             .arguments = arguments,
         } });
     }
@@ -170,7 +170,7 @@ pub const Parser = struct {
     // FunctionArguments ::= Expression ("," Expression)*
     fn parse_function_arguments(self: *Parser) ParserError![]*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function arguments\n", .{});
-        var node_list = std.ArrayList(*Node).init(self.allocator);
+        var node_list = std.ArrayList(*Node).init(self.arena);
 
         var first = true;
         while (true) {
@@ -195,7 +195,7 @@ pub const Parser = struct {
 
         _ = try self.parse_token(tokenizer.TokenType.LBRACE);
 
-        var statements = std.ArrayList(*Node).init(self.allocator);
+        var statements = std.ArrayList(*Node).init(self.arena);
         while (self.accept_parse(parse_statement)) |expr| {
             try statements.append(expr);
         }
@@ -218,7 +218,7 @@ pub const Parser = struct {
 
         _ = try self.parse_token(tokenizer.TokenType.LBRACE);
 
-        var statements = std.ArrayList(*Node).init(self.allocator);
+        var statements = std.ArrayList(*Node).init(self.arena);
         while (self.accept_parse(parse_statement)) |expr| {
             try statements.append(expr);
         }
@@ -354,7 +354,7 @@ pub const Parser = struct {
             .IDENTIFIER => |identifier_token| try self.create_node(.{
                 .PRIMARY_EXPRESSION = .{
                     .IDENTIFIER = .{
-                        .name = try self.allocator.dupe(u8, identifier_token),
+                        .name = try self.arena.dupe(u8, identifier_token),
                     },
                 },
             }),
@@ -375,12 +375,12 @@ pub const Parser = struct {
         _ = try self.parse_token(tokenizer.TokenType.ARROW);
         _ = try self.parse_token(tokenizer.TokenType.LBRACE);
 
-        var nodes = std.ArrayList(*Node).init(self.allocator);
+        var nodes = std.ArrayList(*Node).init(self.arena);
         while (self.accept_parse(parse_statement)) |expression| {
             try nodes.append(expression);
         }
 
-        std.debug.assert(nodes.getLast().STATEMENT.statement.* == .RETURN_STATEMENT);
+        if (nodes.getLast().STATEMENT.statement.* != .RETURN_STATEMENT) return ParserError.ParsingError;
 
         _ = try self.parse_token(tokenizer.TokenType.RBRACE);
 
@@ -393,7 +393,7 @@ pub const Parser = struct {
     // FunctionParameters ::= IDENTIFIER ("," IDENTIFIER)*
     fn parse_function_parameters(self: *Parser) ParserError![]*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function parameters\n", .{});
-        var node_list = std.ArrayList(*Node).init(self.allocator);
+        var node_list = std.ArrayList(*Node).init(self.arena);
 
         var first = true;
         while (true) {
@@ -406,7 +406,7 @@ pub const Parser = struct {
             try node_list.append(try self.create_node(.{
                 .PRIMARY_EXPRESSION = .{
                     .IDENTIFIER = .{
-                        .name = try self.allocator.dupe(u8, ident.type.IDENTIFIER),
+                        .name = try self.arena.dupe(u8, ident.type.IDENTIFIER),
                     },
                 },
             }));
@@ -477,7 +477,7 @@ pub const Parser = struct {
     }
 
     fn create_node(self: *Parser, node_value: Node) !*Node {
-        const node = try self.allocator.create(Node);
+        const node = try self.arena.create(Node);
         node.* = node_value;
         return node;
     }
