@@ -53,35 +53,32 @@ pub const Tokenizer = struct {
     }
 
     pub fn next(self: *Tokenizer) TokenizerError!?Token {
-        defer self.offset += 1;
         self.skip_whitespace();
         self.skip_comments();
         self.skip_whitespace();
 
         if (self.offset >= self.buf.len) return null;
 
-        const c = self.buf[self.offset];
+        if (self.accept_string("let")) return self.create_token(.{ .LET = void{} });
+        if (self.accept_string("if")) return self.create_token(.{ .IF = void{} });
+        if (self.accept_string("while")) return self.create_token(.{ .WHILE = void{} });
+        if (self.accept_string("return")) return self.create_token(.{ .RETURN = void{} });
+        if (self.accept_string("true")) return self.create_token(.{ .BOOLEAN = true });
+        if (self.accept_string("false")) return self.create_token(.{ .BOOLEAN = false });
 
-        if (self.accept_substr("let")) return self.create_token(.{ .LET = void{} });
-        if (self.accept_substr("if")) return self.create_token(.{ .IF = void{} });
-        if (self.accept_substr("while")) return self.create_token(.{ .WHILE = void{} });
-        if (self.accept_substr("return")) return self.create_token(.{ .RETURN = void{} });
-        if (self.accept_substr("true")) return self.create_token(.{ .BOOLEAN = true });
-        if (self.accept_substr("false")) return self.create_token(.{ .BOOLEAN = false });
-
-        if (self.accept_substr("=>")) return self.create_token(.{ .ARROW = void{} });
-        if (c == ';') return self.create_token(.{ .SEMICOLON = void{} });
-        if (c == ',') return self.create_token(.{ .COMMA = void{} });
-        if (c == '(') return self.create_token(.{ .LPAREN = void{} });
-        if (c == ')') return self.create_token(.{ .RPAREN = void{} });
-        if (c == '{') return self.create_token(.{ .LBRACE = void{} });
-        if (c == '}') return self.create_token(.{ .RBRACE = void{} });
-        if (c == '=') return self.create_token(.{ .EQUALS = void{} });
-        if (c == '+') return self.create_token(.{ .PLUS = void{} });
-        if (c == '-') return self.create_token(.{ .MINUS = void{} });
-        if (c == '*') return self.create_token(.{ .MUL = void{} });
-        if (c == '/') return self.create_token(.{ .DIV = void{} });
-        if (c == '!') return self.create_token(.{ .BANG = void{} });
+        if (self.accept_string("=>")) return self.create_token(.{ .ARROW = void{} });
+        if (self.accept_string(";")) return self.create_token(.{ .SEMICOLON = void{} });
+        if (self.accept_string(",")) return self.create_token(.{ .COMMA = void{} });
+        if (self.accept_string("(")) return self.create_token(.{ .LPAREN = void{} });
+        if (self.accept_string(")")) return self.create_token(.{ .RPAREN = void{} });
+        if (self.accept_string("{")) return self.create_token(.{ .LBRACE = void{} });
+        if (self.accept_string("}")) return self.create_token(.{ .RBRACE = void{} });
+        if (self.accept_string("=")) return self.create_token(.{ .EQUALS = void{} });
+        if (self.accept_string("+")) return self.create_token(.{ .PLUS = void{} });
+        if (self.accept_string("-")) return self.create_token(.{ .MINUS = void{} });
+        if (self.accept_string("*")) return self.create_token(.{ .MUL = void{} });
+        if (self.accept_string("/")) return self.create_token(.{ .DIV = void{} });
+        if (self.accept_string("!")) return self.create_token(.{ .BANG = void{} });
 
         const string = self.consume_string();
         if (string.len == 0) return TokenizerError.TokenizingError;
@@ -92,9 +89,9 @@ pub const Tokenizer = struct {
     }
 
     fn skip_comments(self: *Tokenizer) void {
-        if (!self.accept_substr("/*")) return;
+        if (!self.accept_string("/*")) return;
 
-        while (!self.accept_substr("*/")) {
+        while (!self.accept_string("*/")) {
             self.offset += 1;
         }
     }
@@ -112,17 +109,16 @@ pub const Tokenizer = struct {
         defer self.offset = if (self.offset > 0) self.offset - 1 else self.offset;
         const start = self.offset;
         while (true) {
+            defer self.offset += 1;
             if (self.offset >= self.buf.len) return self.buf[start..self.offset];
 
             const c = self.buf[self.offset];
 
             if (!std.ascii.isAlphanumeric(c) and c != '_') return self.buf[start..self.offset];
-
-            self.offset += 1;
         }
     }
 
-    fn accept_substr(self: *Tokenizer, substr: []const u8) bool {
+    fn accept_string(self: *Tokenizer, substr: []const u8) bool {
         if (self.offset + substr.len > self.buf.len) return false;
         if (std.mem.eql(u8, self.buf[self.offset .. self.offset + substr.len], substr)) {
             self.offset += substr.len;
