@@ -4,7 +4,7 @@ Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | Wh
 
 AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
 
-FunctionCallStatement ::= IDENTIFIER LPAREN FunctionArguments? RPAREN
+FunctionCallStatement ::= (IDENTIFIER | FunctionDefinition) LPAREN FunctionArguments? RPAREN
 
 IfStatement ::= "if" Expression LBRACE Statement* RBRACE -- TODO: Should function definitions be allowed?
 

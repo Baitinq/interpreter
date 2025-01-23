@@ -97,16 +97,25 @@ pub const Evaluator = struct {
 
         const function_call_statement = node.FUNCTION_CALL_STATEMENT;
 
-        // Print function implementation
-        if (std.mem.eql(u8, function_call_statement.name, "print")) {
-            std.debug.assert(function_call_statement.arguments.len == 1);
-            std.debug.print("PRINT: {any}\n", .{try self.get_expression_value(function_call_statement.arguments[0])});
-            return null;
+        switch (function_call_statement.expression.*) {
+            .FUNCTION_DEFINITION => |*function_definition| {
+                return try self.evaluate_function_definition(@ptrCast(function_definition), function_call_statement.arguments);
+            },
+            .PRIMARY_EXPRESSION => |*primary_expression| {
+                std.debug.assert(primary_expression.* == .IDENTIFIER);
+
+                // Print function implementation
+                if (std.mem.eql(u8, function_call_statement.expression.PRIMARY_EXPRESSION.IDENTIFIER.name, "print")) {
+                    std.debug.assert(function_call_statement.arguments.len == 1);
+                    std.debug.print("PRINT: {any}\n", .{try self.get_expression_value(function_call_statement.arguments[0])});
+                    return null;
+                }
+
+                const function_definition = self.environment.get_variable(primary_expression.IDENTIFIER.name) orelse return EvaluatorError.EvaluationError;
+                return self.evaluate_function_definition(function_definition.FUNCTION_DEFINITION, function_call_statement.arguments);
+            },
+            else => unreachable,
         }
-
-        const function_definition = self.environment.get_variable(function_call_statement.name) orelse return EvaluatorError.EvaluationError;
-
-        return self.evaluate_function_definition(function_definition.FUNCTION_DEFINITION, function_call_statement.arguments);
     }
 
     fn evaluate_if_statement(self: *Evaluator, node: *parser.Node) !?*Variable {

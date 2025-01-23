@@ -19,7 +19,7 @@ pub const Node = union(enum) {
         expression: *Node,
     },
     FUNCTION_CALL_STATEMENT: struct {
-        name: []const u8,
+        expression: *Node,
         arguments: []*Node,
     },
     IF_STATEMENT: struct {
@@ -149,11 +149,14 @@ pub const Parser = struct {
         });
     }
 
-    // FunctionCallStatement ::= IDENTIFIER LPAREN FunctionArguments? RPAREN
+    // FunctionCallStatement ::= (IDENTIFIER | FunctionDefinition) LPAREN FunctionArguments? RPAREN
     fn parse_function_call_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function call statement {any}\n", .{self.peek_token()});
 
-        const identifier = try self.parse_token(tokenizer.TokenType.IDENTIFIER);
+        const identifier = self.accept_token(tokenizer.TokenType.IDENTIFIER);
+        const fn_def = self.accept_parse(parse_function_definition);
+
+        if (identifier == null and fn_def == null) return ParserError.ParsingError;
 
         _ = try self.parse_token(tokenizer.TokenType.LPAREN);
 
@@ -161,8 +164,21 @@ pub const Parser = struct {
 
         _ = try self.parse_token(tokenizer.TokenType.RPAREN);
 
+        if (fn_def != null) {
+            return self.create_node(.{ .FUNCTION_CALL_STATEMENT = .{
+                .expression = fn_def.?,
+                .arguments = arguments,
+            } });
+        }
+
         return self.create_node(.{ .FUNCTION_CALL_STATEMENT = .{
-            .name = try self.arena.dupe(u8, identifier.type.IDENTIFIER),
+            .expression = try self.create_node(.{
+                .PRIMARY_EXPRESSION = .{
+                    .IDENTIFIER = .{
+                        .name = try self.arena.dupe(u8, identifier.?.type.IDENTIFIER),
+                    },
+                },
+            }),
             .arguments = arguments,
         } });
     }
@@ -327,8 +343,8 @@ pub const Parser = struct {
     fn parse_primary_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing primary expression {any}\n", .{self.peek_token()});
 
-        if (self.accept_parse(parse_function_definition)) |stmt| return stmt;
         if (self.accept_parse(parse_function_call_statement)) |stmt| return stmt;
+        if (self.accept_parse(parse_function_definition)) |stmt| return stmt;
 
         // LPAREN (Expression) RPAREN
         if (self.accept_token(tokenizer.TokenType.LPAREN)) |_| {
