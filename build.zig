@@ -26,15 +26,15 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
+    const llvm_zig = b.dependency("llvm-zig", .{});
+    exe_mod.addImport("llvm", llvm_zig.module("llvm"));
+
     // This creates another `std.Build.Step.Compile`, but this one builds an executable
     // rather than a static library.
     const exe = b.addExecutable(.{
         .name = "interpreter",
         .root_module = exe_mod,
     });
-
-    const llvm_zig = b.dependency("llvm-zig", .{});
-    exe.root_module.addImport("llvm", llvm_zig.module("llvm"));
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -45,7 +45,7 @@ pub fn build(b: *std.Build) !void {
     const exe_check = b.addExecutable(.{
         .name = "interpreter-lsp",
         .root_source_file = b.path("src/main.zig"),
-        .target = target,
+        .root_module = exe_mod,
         .optimize = optimize,
     });
 
