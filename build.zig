@@ -33,6 +33,9 @@ pub fn build(b: *std.Build) !void {
         .root_module = exe_mod,
     });
 
+    const llvm_zig = b.dependency("llvm-zig", .{});
+    exe.root_module.addImport("llvm", llvm_zig.module("llvm"));
+
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
