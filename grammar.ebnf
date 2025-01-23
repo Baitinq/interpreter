@@ -14,7 +14,7 @@ ReturnStatement ::= RETURN Expression
 
 FunctionArguments ::= Expression ("," Expression)*
 
-Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition
+Expression ::= EqualityExpression | AdditiveExpression
 
 EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
 
@@ -24,7 +24,7 @@ MultiplicativeExpression ::= UnaryExpression (("*" | "/") UnaryExpression)*
 
 UnaryExpression ::= ("!" | "-") UnaryExpression | PrimaryExpression
 
-PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | LPAREN Expression RPAREN
+PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | FunctionDefinition | LPAREN Expression RPAREN
 
 FunctionDefinition ::= LPAREN FunctionParameters? RPAREN ARROW LBRACE Statement* ReturnStatement SEMICOLON RBRACE
 

@@ -232,7 +232,7 @@ pub const Parser = struct {
         } });
     }
 
-    // Expression   ::= EqualityExpression | AdditiveExpression
+    // Expression ::= EqualityExpression | AdditiveExpression
     fn parse_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing expression {any}\n", .{self.peek_token()});
 
