@@ -231,12 +231,11 @@ pub const Parser = struct {
         } });
     }
 
-    // Expression   ::= EqualityExpression | AdditiveExpression | FunctionDefinition
+    // Expression   ::= EqualityExpression | AdditiveExpression
     fn parse_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing expression\n", .{});
 
         return self.accept_parse(parse_equality_expression) orelse
-            self.accept_parse(parse_function_definition) orelse
             self.accept_parse(parse_additive_expression) orelse
             return ParserError.ParsingError;
     }
@@ -323,17 +322,19 @@ pub const Parser = struct {
         } });
     }
 
-    // PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | LPAREN Expression RPAREN
+    // PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | FunctionDefinition | LPAREN Expression RPAREN
     fn parse_primary_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing primary expression\n", .{});
 
+        if (self.accept_parse(parse_function_definition)) |stmt| return stmt;
+        if (self.accept_parse(parse_function_call_statement)) |stmt| return stmt;
+
+        // LPAREN (Expression) RPAREN
         if (self.accept_token(tokenizer.TokenType.LPAREN)) |_| {
             const expr = try self.parse_expression();
             _ = try self.parse_token(tokenizer.TokenType.RPAREN);
             return expr;
         }
-
-        if (self.accept_parse(parse_function_call_statement)) |stmt| return stmt;
 
         const token = self.consume_token() orelse return ParserError.ParsingError;
 
