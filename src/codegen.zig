@@ -7,40 +7,26 @@ const types = llvm.types;
 const core = llvm.core;
 
 pub const CodeGen = struct {
-    pub fn generate() void {
+    llvm_module: types.LLVMModuleRef,
+
+    pub fn init(arena: std.mem.Allocator) !*CodeGen {
         // Initialize LLVM
         _ = target.LLVMInitializeNativeTarget();
         _ = target.LLVMInitializeNativeAsmPrinter();
         _ = target.LLVMInitializeNativeAsmParser();
 
-        // Create a new LLVM module
-        const module: types.LLVMModuleRef = core.LLVMModuleCreateWithName("sum_module");
-        var params: [2]types.LLVMTypeRef = [_]types.LLVMTypeRef{
-            core.LLVMInt32Type(),
-            core.LLVMInt32Type(),
+        const module: types.LLVMModuleRef = core.LLVMModuleCreateWithName("module");
+
+        const self = try arena.create(CodeGen);
+        self.* = .{
+            .llvm_module = module,
         };
 
-        var exit_params: [1]types.LLVMTypeRef = [_]types.LLVMTypeRef{
-            core.LLVMInt32Type(),
-        };
-        const exit_func_type: types.LLVMTypeRef = core.LLVMFunctionType(core.LLVMInt32Type(), &exit_params, 1, 0);
-        const exit_func: types.LLVMValueRef = core.LLVMAddFunction(module, "exit", exit_func_type);
+        return self;
+    }
 
-        // Create a function that computes the sum of two integers
-        const func_type: types.LLVMTypeRef = core.LLVMFunctionType(core.LLVMInt32Type(), &params, 2, 0);
-        const sum_func: types.LLVMValueRef = core.LLVMAddFunction(module, "main", func_type);
-        const entry: types.LLVMBasicBlockRef = core.LLVMAppendBasicBlock(sum_func, "entry");
-        const builder: types.LLVMBuilderRef = core.LLVMCreateBuilder();
-        core.LLVMPositionBuilderAtEnd(builder, entry);
-        const arg1: types.LLVMValueRef = core.LLVMGetParam(sum_func, 0);
-        const arg2: types.LLVMValueRef = core.LLVMGetParam(sum_func, 1);
-        const sum: types.LLVMValueRef = core.LLVMBuildAdd(builder, arg1, arg2, "sum");
-        const exit_status: types.LLVMValueRef = core.LLVMConstInt(core.LLVMInt32Type(), 7, 0);
-        var exit_args: [1]types.LLVMValueRef = undefined;
-        exit_args[0] = exit_status;
-        _ = core.LLVMBuildCall2(builder, exit_func_type, exit_func, &exit_args, 1, "exit_call");
-        _ = core.LLVMBuildRet(builder, sum);
-
+    pub fn deinit(self: *CodeGen) void {
+        // Generate code
         const triple = target_m.LLVMGetDefaultTargetTriple();
         var target_ref: types.LLVMTargetRef = undefined;
         _ = target_m.LLVMGetTargetFromTriple(triple, &target_ref, null);
@@ -58,7 +44,7 @@ pub const CodeGen = struct {
         const filename = "output.o";
         _ = target_m.LLVMTargetMachineEmitToFile(
             target_machine,
-            module,
+            self.llvm_module,
             filename,
             types.LLVMCodeGenFileType.LLVMObjectFile,
             null,
@@ -66,8 +52,29 @@ pub const CodeGen = struct {
         std.debug.print("Object file generated: {s}\n", .{filename});
 
         // Clean up LLVM resources
-        core.LLVMDisposeBuilder(builder);
-        core.LLVMDisposeModule(module);
+        core.LLVMDisposeModule(self.llvm_module);
         core.LLVMShutdown();
+    }
+
+    pub fn generate(self: *CodeGen) void {
+        const builder = core.LLVMCreateBuilder();
+        defer core.LLVMDisposeBuilder(builder);
+
+        const main_func_type = core.LLVMFunctionType(core.LLVMInt32Type(), null, 0, 0);
+        const main_func = core.LLVMAddFunction(self.llvm_module, "main", main_func_type);
+        const main_entry = core.LLVMAppendBasicBlock(main_func, "entrypoint");
+        core.LLVMPositionBuilderAtEnd(builder, main_entry);
+
+        var exit_func_params = [_]types.LLVMTypeRef{
+            core.LLVMInt32Type(),
+        };
+        const exit_func_type = core.LLVMFunctionType(core.LLVMInt32Type(), &exit_func_params, exit_func_params.len, 0);
+        const exit_func = core.LLVMAddFunction(self.llvm_module, "exit", exit_func_type);
+
+        var exit_func_args = [_]types.LLVMValueRef{
+            core.LLVMConstInt(core.LLVMInt32Type(), 7, 0),
+        };
+        const exit_func_ret = core.LLVMBuildCall2(builder, exit_func_type, exit_func, &exit_func_args, exit_func_args.len, "exit_call");
+        _ = core.LLVMBuildRet(builder, exit_func_ret);
     }
 };

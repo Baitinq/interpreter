@@ -22,8 +22,10 @@ pub fn main() !void {
     defer arena.deinit();
 
     const source_evaluator = try evaluator.Evaluator.init(arena.allocator());
+    const source_codegen = try codegen.CodeGen.init(arena.allocator());
+    defer source_codegen.deinit();
 
-    codegen.CodeGen.generate();
+    source_codegen.generate();
 
     if (std.mem.eql(u8, path, "-i")) {
         while (true) {
