@@ -65,6 +65,19 @@ pub const CodeGen = struct {
         const main_entry = core.LLVMAppendBasicBlock(main_func, "entrypoint");
         core.LLVMPositionBuilderAtEnd(builder, main_entry);
 
+        const format_str = "Hello, World!\n";
+        const format_str_ptr = core.LLVMBuildGlobalStringPtr(builder, format_str, "format_str_ptr");
+
+        var print_function_params = [_]types.LLVMTypeRef{
+            core.LLVMPointerType(core.LLVMInt8Type(), 0),
+        };
+        const print_func_type = core.LLVMFunctionType(core.LLVMVoidType(), &print_function_params, print_function_params.len, 0);
+        const print_func = core.LLVMAddFunction(self.llvm_module, "printf", print_func_type);
+        var print_func_args = [_]types.LLVMValueRef{
+            format_str_ptr,
+        };
+        _ = core.LLVMBuildCall2(builder, print_func_type, print_func, &print_func_args, print_func_args.len, "print_call");
+
         var exit_func_params = [_]types.LLVMTypeRef{
             core.LLVMInt32Type(),
         };
