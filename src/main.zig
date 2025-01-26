@@ -25,7 +25,7 @@ pub fn main() !void {
     const source_codegen = try codegen.CodeGen.init(arena.allocator());
     defer source_codegen.deinit();
 
-    source_codegen.generate();
+    source_codegen.generate_poc();
 
     if (std.mem.eql(u8, path, "-i")) {
         while (true) {
@@ -34,7 +34,7 @@ pub fn main() !void {
             const buf = try stdin.readUntilDelimiterAlloc(allocator, '\n', 1024);
             defer allocator.free(buf);
 
-            process_buf(buf, allocator, arena.allocator(), source_evaluator) catch |err| {
+            process_buf(buf, allocator, arena.allocator(), source_evaluator, null) catch |err| {
                 try stdout.print("Error processing line: {any}\n", .{err});
             };
         }
@@ -43,11 +43,25 @@ pub fn main() !void {
         const file = try std.fs.cwd().openFile(path, .{});
         const buf = try file.readToEndAlloc(allocator, 1 * 1024 * 1024);
         defer allocator.free(buf);
-        try process_buf(buf, allocator, arena.allocator(), source_evaluator);
+        if (std.os.argv.len < 3) {
+            try process_buf(
+                buf,
+                allocator,
+                arena.allocator(),
+                source_evaluator,
+                null,
+            );
+        } else try process_buf(
+            buf,
+            allocator,
+            arena.allocator(),
+            source_evaluator,
+            source_codegen,
+        );
     }
 }
 
-fn process_buf(buf: []u8, allocator: std.mem.Allocator, arena: std.mem.Allocator, source_evaluator: *evaluator.Evaluator) !void {
+fn process_buf(buf: []u8, allocator: std.mem.Allocator, arena: std.mem.Allocator, source_evaluator: *evaluator.Evaluator, source_codegen: ?*codegen.CodeGen) !void {
     std.debug.print("Buf:\n{s}\n", .{buf});
 
     var token_list = std.ArrayList(tokenizer.Token).init(allocator);
@@ -63,8 +77,12 @@ fn process_buf(buf: []u8, allocator: std.mem.Allocator, arena: std.mem.Allocator
     const ast = try source_parser.parse();
     std.debug.print("AST: {any}\n", .{ast});
 
-    const result = try source_evaluator.evaluate_ast(ast);
-    std.debug.print("Evaluation result: {any}\n", .{result});
+    if (source_codegen != null) {
+        try source_codegen.?.generate(ast);
+    } else {
+        const result = try source_evaluator.evaluate_ast(ast);
+        std.debug.print("Evaluation result: {any}\n", .{result});
+    }
 }
 
 test {

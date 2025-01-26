@@ -8,6 +8,7 @@ const core = llvm.core;
 
 pub const CodeGen = struct {
     llvm_module: types.LLVMModuleRef,
+    builder: types.LLVMBuilderRef,
 
     pub fn init(arena: std.mem.Allocator) !*CodeGen {
         // Initialize LLVM
@@ -16,10 +17,12 @@ pub const CodeGen = struct {
         _ = target.LLVMInitializeNativeAsmParser();
 
         const module: types.LLVMModuleRef = core.LLVMModuleCreateWithName("module");
+        const builder = core.LLVMCreateBuilder();
 
         const self = try arena.create(CodeGen);
         self.* = .{
             .llvm_module = module,
+            .builder = builder,
         };
 
         return self;
@@ -52,21 +55,56 @@ pub const CodeGen = struct {
         std.debug.print("Object file generated: {s}\n", .{filename});
 
         // Clean up LLVM resources
+        defer core.LLVMDisposeBuilder(self.builder);
         core.LLVMDisposeModule(self.llvm_module);
         core.LLVMShutdown();
     }
 
-    pub fn generate(self: *CodeGen) void {
-        const builder = core.LLVMCreateBuilder();
-        defer core.LLVMDisposeBuilder(builder);
+    pub fn generate(self: *CodeGen, ast: *parser.Node) !void {
+        std.debug.assert(ast.* == parser.Node.PROGRAM);
 
+        const program = ast.PROGRAM;
+
+        for (program.statements) |stmt| {
+            _ = try self.generate_statement(stmt);
+        }
+    }
+
+    fn generate_statement(self: *CodeGen, statement: *parser.Node) !void {
+        std.debug.assert(statement.* == parser.Node.STATEMENT);
+
+        switch (statement.STATEMENT.statement.*) {
+            // .ASSIGNMENT_STATEMENT => |*assignment_statement| {
+            //     try self.evaluate_assignment_statement(@ptrCast(assignment_statement));
+            //     return null;
+            // },
+            // .FUNCTION_CALL_STATEMENT => |*function_call_statement| {
+            //     _ = try self.evaluate_function_call_statement(@ptrCast(function_call_statement));
+            //     return null;
+            // },
+            .RETURN_STATEMENT => |*return_statement| return try self.generate_return_statement(@ptrCast(return_statement)),
+            else => unreachable,
+        }
+
+        return null;
+    }
+
+    fn generate_return_statement(self: *CodeGen, statement: *parser.Node) !void {
+        std.debug.assert(statement.* == parser.Node.RETURN_STATEMENT);
+
+        // const return_value = statement.RETURN_STATEMENT.return_value;
+
+        _ = core.LLVMBuildRet(self.builder, core.LLVMConstInt(core.LLVMInt32Type(), 12, 0));
+    }
+
+    pub fn generate_poc(self: *CodeGen) void {
         const main_func_type = core.LLVMFunctionType(core.LLVMInt32Type(), null, 0, 0);
         const main_func = core.LLVMAddFunction(self.llvm_module, "_start", main_func_type);
         const main_entry = core.LLVMAppendBasicBlock(main_func, "entrypoint");
-        core.LLVMPositionBuilderAtEnd(builder, main_entry);
+        core.LLVMPositionBuilderAtEnd(self.builder, main_entry);
 
         const format_str = "Hello, World!\n";
-        const format_str_ptr = core.LLVMBuildGlobalStringPtr(builder, format_str, "format_str_ptr");
+        const format_str_ptr = core.LLVMBuildGlobalStringPtr(self.builder, format_str, "format_str_ptr");
 
         var print_function_params = [_]types.LLVMTypeRef{
             core.LLVMPointerType(core.LLVMInt8Type(), 0),
@@ -76,7 +114,7 @@ pub const CodeGen = struct {
         var print_func_args = [_]types.LLVMValueRef{
             format_str_ptr,
         };
-        _ = core.LLVMBuildCall2(builder, print_func_type, print_func, &print_func_args, print_func_args.len, "print_call");
+        _ = core.LLVMBuildCall2(self.builder, print_func_type, print_func, &print_func_args, print_func_args.len, "print_call");
 
         var exit_func_params = [_]types.LLVMTypeRef{
             core.LLVMInt32Type(),
@@ -87,7 +125,7 @@ pub const CodeGen = struct {
         var exit_func_args = [_]types.LLVMValueRef{
             core.LLVMConstInt(core.LLVMInt32Type(), 7, 0),
         };
-        const exit_func_ret = core.LLVMBuildCall2(builder, exit_func_type, exit_func, &exit_func_args, exit_func_args.len, "exit_call");
-        _ = core.LLVMBuildRet(builder, exit_func_ret);
+        const exit_func_ret = core.LLVMBuildCall2(self.builder, exit_func_type, exit_func, &exit_func_args, exit_func_args.len, "exit_call");
+        _ = core.LLVMBuildRet(self.builder, exit_func_ret);
     }
 };
