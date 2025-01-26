@@ -61,7 +61,7 @@ pub const CodeGen = struct {
         defer core.LLVMDisposeBuilder(builder);
 
         const main_func_type = core.LLVMFunctionType(core.LLVMInt32Type(), null, 0, 0);
-        const main_func = core.LLVMAddFunction(self.llvm_module, "main", main_func_type);
+        const main_func = core.LLVMAddFunction(self.llvm_module, "_start", main_func_type);
         const main_entry = core.LLVMAppendBasicBlock(main_func, "entrypoint");
         core.LLVMPositionBuilderAtEnd(builder, main_entry);
 
