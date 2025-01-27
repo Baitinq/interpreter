@@ -23,9 +23,9 @@ pub fn main() !void {
 
     const source_evaluator = try evaluator.Evaluator.init(arena.allocator());
     const source_codegen = try codegen.CodeGen.init(arena.allocator());
-    defer source_codegen.deinit();
+    defer source_codegen.deinit() catch {};
 
-    source_codegen.generate_poc();
+    // source_codegen.generate_poc();
 
     if (std.mem.eql(u8, path, "-i")) {
         while (true) {
