@@ -34,6 +34,12 @@ pub const CodeGen = struct {
             .arena = arena,
         };
 
+        const printf_function_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{
+            core.LLVMPointerType(core.LLVMInt8Type(), 0),
+            core.LLVMInt64Type(),
+        }), 2, 0);
+        _ = core.LLVMAddFunction(self.llvm_module, "printf", printf_function_type) orelse return CodeGenError.CompilationError;
+
         return self;
     }
 
@@ -90,12 +96,10 @@ pub const CodeGen = struct {
         switch (statement.STATEMENT.statement.*) {
             .ASSIGNMENT_STATEMENT => |*assignment_statement| {
                 try self.generate_assignment_statement(@ptrCast(assignment_statement));
-                return;
             },
-            // .FUNCTION_CALL_STATEMENT => |*function_call_statement| {
-            //     _ = try self.generate_function_call_statement(@ptrCast(function_call_statement));
-            //     return null;
-            // },
+            .FUNCTION_CALL_STATEMENT => |*function_call_statement| {
+                _ = try self.generate_function_call_statement(@ptrCast(function_call_statement));
+            },
             .RETURN_STATEMENT => |*return_statement| return try self.generate_return_statement(@ptrCast(return_statement)),
             else => unreachable,
         }
@@ -124,6 +128,39 @@ pub const CodeGen = struct {
         for (function_defintion.statements) |stmt| {
             try self.generate_statement(stmt);
         }
+    }
+
+    fn generate_function_call_statement(self: *CodeGen, statement: *parser.Node) !void {
+        std.debug.assert(statement.* == parser.Node.FUNCTION_CALL_STATEMENT);
+        const function_call_statement = statement.FUNCTION_CALL_STATEMENT;
+
+        std.debug.assert(function_call_statement.expression.* == parser.Node.PRIMARY_EXPRESSION);
+        const primary_expression = function_call_statement.expression.PRIMARY_EXPRESSION;
+
+        std.debug.assert(primary_expression == .IDENTIFIER);
+        const ident = primary_expression.IDENTIFIER;
+
+        std.debug.assert(function_call_statement.arguments.len == 1);
+        const argument = function_call_statement.arguments[0];
+        std.debug.assert(argument.* == .PRIMARY_EXPRESSION);
+        std.debug.assert(argument.PRIMARY_EXPRESSION == .NUMBER);
+        const num_argument = argument.PRIMARY_EXPRESSION.NUMBER;
+
+        const function_name = try std.fmt.allocPrintZ(self.arena, "{s}", .{ident.name});
+        const function = core.LLVMGetNamedFunction(self.llvm_module, function_name) orelse return CodeGenError.CompilationError;
+
+        const format_str = "%d\n";
+        const format_str_ptr = core.LLVMBuildGlobalStringPtr(self.builder, format_str, "format_str_ptr");
+
+        // TODO: Can we get the type from the function name?
+        const fucntion_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{
+            core.LLVMPointerType(core.LLVMInt8Type(), 0),
+            core.LLVMInt64Type(),
+        }), 2, 0);
+
+        const arguments = @constCast(&[_]types.LLVMValueRef{ format_str_ptr, core.LLVMConstInt(core.LLVMInt64Type(), @intCast(num_argument.value), 0) });
+
+        _ = core.LLVMBuildCall2(self.builder, fucntion_type, function, arguments, 2, "function_call") orelse return CodeGenError.CompilationError;
     }
 
     fn generate_return_statement(self: *CodeGen, statement: *parser.Node) !void {
