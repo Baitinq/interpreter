@@ -96,8 +96,8 @@ pub const CodeGen = struct {
             //     _ = try self.generate_function_call_statement(@ptrCast(function_call_statement));
             //     return null;
             // },
-            // .RETURN_STATEMENT => |*return_statement| return try self.generate_return_statement(@ptrCast(return_statement)),
-            else => {},
+            .RETURN_STATEMENT => |*return_statement| return try self.generate_return_statement(@ptrCast(return_statement)),
+            else => unreachable,
         }
     }
 
@@ -120,11 +120,10 @@ pub const CodeGen = struct {
         //tmp
         std.debug.assert(assignment_statement.expression.* == parser.Node.FUNCTION_DEFINITION);
         const function_defintion = assignment_statement.expression.FUNCTION_DEFINITION;
-        std.debug.print("XD: {any}\n", .{function_defintion.statements[0]});
-        std.debug.assert(function_defintion.statements[0].* == parser.Node.STATEMENT);
-        const xd = function_defintion.statements[0];
-        std.debug.assert(xd.STATEMENT.statement.* == parser.Node.RETURN_STATEMENT);
-        try self.generate_return_statement(xd.STATEMENT.statement);
+
+        for (function_defintion.statements) |stmt| {
+            try self.generate_statement(stmt);
+        }
     }
 
     fn generate_return_statement(self: *CodeGen, statement: *parser.Node) !void {
