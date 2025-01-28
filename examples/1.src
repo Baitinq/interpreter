@@ -1,7 +1,7 @@
 let main = () => {
 	let i = 4;
 
-	print(i);
+	printf(i);
 
 	return 0;
 };
