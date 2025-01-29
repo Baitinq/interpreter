@@ -3,7 +3,7 @@ let main = () => {
 
 	test = 7;
 
-	printf(test);
+	print(test);
 
 	return test;
 };

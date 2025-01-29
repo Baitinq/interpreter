@@ -214,6 +214,7 @@ pub const CodeGen = struct {
 
         const expression = statement.RETURN_STATEMENT.expression;
 
+        // TODO: Abstract this as we also need this for decls
         const num_argument: types.LLVMValueRef = switch (expression.*) {
             .PRIMARY_EXPRESSION => |primary_expression| switch (primary_expression) {
                 .NUMBER => |n| core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0),
