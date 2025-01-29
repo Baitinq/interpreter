@@ -183,7 +183,7 @@ pub const CodeGen = struct {
         }
     }
 
-    fn generate_function_call_statement(self: *CodeGen, statement: *parser.Node) !void {
+    fn generate_function_call_statement(self: *CodeGen, statement: *parser.Node) !types.LLVMValueRef {
         std.debug.assert(statement.* == parser.Node.FUNCTION_CALL_STATEMENT);
         const function_call_statement = statement.FUNCTION_CALL_STATEMENT;
 
@@ -206,18 +206,21 @@ pub const CodeGen = struct {
 
         const xd = self.symbol_table.get(ident.name) orelse return CodeGenError.CompilationError;
 
-        _ = core.LLVMBuildCall2(self.builder, xd.type, xd.value, @ptrCast(arguments.items), @intCast(arguments.items.len), "function_call") orelse return CodeGenError.CompilationError;
+        return core.LLVMBuildCall2(self.builder, xd.type, xd.value, @ptrCast(arguments.items), @intCast(arguments.items.len), "function_call") orelse return CodeGenError.CompilationError;
     }
 
     fn generate_return_statement(self: *CodeGen, statement: *parser.Node) !void {
         std.debug.assert(statement.* == parser.Node.RETURN_STATEMENT);
 
         const expression = statement.RETURN_STATEMENT.expression;
-        std.debug.assert(expression.* == parser.Node.PRIMARY_EXPRESSION);
 
-        const num_argument: types.LLVMValueRef = switch (expression.PRIMARY_EXPRESSION) {
-            .NUMBER => |n| core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0),
-            .IDENTIFIER => |i| core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), self.symbol_table.get(i.name).?.value, "").?,
+        const num_argument: types.LLVMValueRef = switch (expression.*) {
+            .PRIMARY_EXPRESSION => |primary_expression| switch (primary_expression) {
+                .NUMBER => |n| core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0),
+                .IDENTIFIER => |i| core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), self.symbol_table.get(i.name).?.value, "").?,
+                else => unreachable,
+            },
+            .FUNCTION_CALL_STATEMENT => |*fn_call| try self.generate_function_call_statement(@ptrCast(fn_call)),
             else => unreachable,
         };
 

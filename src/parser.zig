@@ -58,9 +58,6 @@ pub const Node = union(enum) {
         IDENTIFIER: struct {
             name: []const u8,
         },
-        FUNCTION_CALL: struct {
-            name: []const u8,
-        },
     },
     FUNCTION_DEFINITION: struct {
         statements: []*Node,

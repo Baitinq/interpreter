@@ -207,7 +207,6 @@ pub const Evaluator = struct {
 
                         return val;
                     },
-                    else => unreachable,
                 }
             },
             // I don't like having 2 places where we evaluate functions
