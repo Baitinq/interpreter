@@ -11,10 +11,15 @@ pub const CodeGenError = error{
     OutOfMemory,
 };
 
+const Variable = struct {
+    type: types.LLVMTypeRef,
+    value: types.LLVMValueRef,
+};
+
 pub const CodeGen = struct {
     llvm_module: types.LLVMModuleRef,
     builder: types.LLVMBuilderRef,
-    symbol_table: std.StringHashMap(types.LLVMValueRef),
+    symbol_table: std.StringHashMap(*Variable), //TODO: Scopes, also add functions here
 
     arena: std.mem.Allocator,
 
@@ -31,7 +36,7 @@ pub const CodeGen = struct {
         self.* = .{
             .llvm_module = module,
             .builder = builder,
-            .symbol_table = std.StringHashMap(types.LLVMValueRef).init(arena),
+            .symbol_table = std.StringHashMap(*Variable).init(arena),
 
             .arena = arena,
         };
@@ -113,7 +118,6 @@ pub const CodeGen = struct {
         const assignment_statement = statement.ASSIGNMENT_STATEMENT;
 
         //tmp
-        std.debug.assert(assignment_statement.is_declaration == true);
         const variable_name = try std.fmt.allocPrintZ(self.arena, "{s}", .{assignment_statement.name});
 
         switch (assignment_statement.expression.*) {
@@ -134,9 +138,17 @@ pub const CodeGen = struct {
             .PRIMARY_EXPRESSION => |exp| {
                 switch (exp) {
                     .NUMBER => {
-                        const variable = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), variable_name) orelse return CodeGenError.CompilationError;
+                        var variable: types.LLVMValueRef = undefined;
+                        if (self.symbol_table.get(variable_name)) |v| {
+                            variable = v.value;
+                        } else {
+                            variable = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), variable_name) orelse return CodeGenError.CompilationError;
+                        }
                         _ = core.LLVMBuildStore(self.builder, core.LLVMConstInt(core.LLVMInt64Type(), @intCast(exp.NUMBER.value), 0), variable) orelse return CodeGenError.CompilationError;
-                        try self.symbol_table.put(variable_name, variable);
+                        try self.symbol_table.put(variable_name, try self.create_variable(.{
+                            .value = variable,
+                            .type = core.LLVMInt64Type(),
+                        }));
                     },
                     else => unreachable,
                 }
@@ -161,7 +173,7 @@ pub const CodeGen = struct {
 
         const num_argument: types.LLVMValueRef = switch (argument.PRIMARY_EXPRESSION) {
             .NUMBER => |n| core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0),
-            .IDENTIFIER => |i| core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), self.symbol_table.get(i.name).?, "").?,
+            .IDENTIFIER => |i| core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), self.symbol_table.get(i.name).?.value, "").?,
             else => unreachable,
         };
 
@@ -171,7 +183,7 @@ pub const CodeGen = struct {
         const format_str = "%d\n";
         const format_str_ptr = core.LLVMBuildGlobalStringPtr(self.builder, format_str, "format_str_ptr");
 
-        // TODO: Can we get the type from the function name?
+        // TODO: Can we get the type from the function name? TODO: Get it from symbol table
         const fucntion_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{
             core.LLVMPointerType(core.LLVMInt8Type(), 0),
             core.LLVMInt64Type(),
@@ -209,35 +221,9 @@ pub const CodeGen = struct {
         _ = core.LLVMBuildRet(self.builder, exit_func_return);
     }
 
-    pub fn generate_poc(self: *CodeGen) void {
-        const main_func_type = core.LLVMFunctionType(core.LLVMInt32Type(), null, 0, 0);
-        const main_func = core.LLVMAddFunction(self.llvm_module, "_start", main_func_type);
-        const main_entry = core.LLVMAppendBasicBlock(main_func, "entrypoint");
-        core.LLVMPositionBuilderAtEnd(self.builder, main_entry);
-
-        const format_str = "Hello, World!\n";
-        const format_str_ptr = core.LLVMBuildGlobalStringPtr(self.builder, format_str, "format_str_ptr");
-
-        var print_function_params = [_]types.LLVMTypeRef{
-            core.LLVMPointerType(core.LLVMInt8Type(), 0),
-        };
-        const print_func_type = core.LLVMFunctionType(core.LLVMVoidType(), &print_function_params, print_function_params.len, 0);
-        const print_func = core.LLVMAddFunction(self.llvm_module, "printf", print_func_type);
-        var print_func_args = [_]types.LLVMValueRef{
-            format_str_ptr,
-        };
-        _ = core.LLVMBuildCall2(self.builder, print_func_type, print_func, &print_func_args, print_func_args.len, "print_call");
-
-        var exit_func_params = [_]types.LLVMTypeRef{
-            core.LLVMInt32Type(),
-        };
-        const exit_func_type = core.LLVMFunctionType(core.LLVMInt32Type(), &exit_func_params, exit_func_params.len, 0);
-        const exit_func = core.LLVMAddFunction(self.llvm_module, "exit", exit_func_type);
-
-        var exit_func_args = [_]types.LLVMValueRef{
-            core.LLVMConstInt(core.LLVMInt32Type(), 7, 0),
-        };
-        const exit_func_ret = core.LLVMBuildCall2(self.builder, exit_func_type, exit_func, &exit_func_args, exit_func_args.len, "exit_call");
-        _ = core.LLVMBuildRet(self.builder, exit_func_ret);
+    fn create_variable(self: *CodeGen, variable_value: Variable) !*Variable {
+        const variable = try self.arena.create(Variable);
+        variable.* = variable_value;
+        return variable;
     }
 };
