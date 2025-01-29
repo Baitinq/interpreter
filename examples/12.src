@@ -1,0 +1,8 @@
+let print_int = (n: i32) => {
+	print(n);
+	return n;
+};
+
+let main = (argc: i32) => {
+	return print_int(argc);
+};

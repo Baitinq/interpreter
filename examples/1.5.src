@@ -1,0 +1,12 @@
+let x = () => {
+	print(22);
+	return 11;
+};
+
+let main = () => {
+	let i = 4;
+
+	print(i);
+
+	return x();
+};
