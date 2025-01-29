@@ -199,10 +199,14 @@ pub const CodeGen = struct {
 
         const expression = statement.RETURN_STATEMENT.expression;
         std.debug.assert(expression.* == parser.Node.PRIMARY_EXPRESSION);
-        const primary_expr = expression.PRIMARY_EXPRESSION.NUMBER.value;
-        // std.debug.assert(primary_expr == parser.Node.PRIMARY_EXPRESSION.NUMBER);
 
-        _ = core.LLVMBuildRet(self.builder, core.LLVMConstInt(core.LLVMInt64Type(), @intCast(primary_expr), 0));
+        const num_argument: types.LLVMValueRef = switch (expression.PRIMARY_EXPRESSION) {
+            .NUMBER => |n| core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0),
+            .IDENTIFIER => |i| core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), self.symbol_table.get(i.name).?.value, "").?,
+            else => unreachable,
+        };
+
+        _ = core.LLVMBuildRet(self.builder, num_argument);
     }
 
     pub fn create_entrypoint(self: *CodeGen) CodeGenError!void {
