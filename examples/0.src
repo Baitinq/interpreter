@@ -1,7 +1,7 @@
 /* HELLO! Welcome to the unnamed language */
 
 let main = () => {
-	printf(2);
+	print(18);
 	
-	return 1;
+	return 2;
 };

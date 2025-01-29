@@ -45,7 +45,28 @@ pub const CodeGen = struct {
             core.LLVMPointerType(core.LLVMInt8Type(), 0),
             core.LLVMInt64Type(),
         }), 2, 0);
-        _ = core.LLVMAddFunction(self.llvm_module, "printf", printf_function_type) orelse return CodeGenError.CompilationError;
+        const printf_function = core.LLVMAddFunction(self.llvm_module, "printf", printf_function_type) orelse return CodeGenError.CompilationError;
+
+        const print_function_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{core.LLVMInt64Type()}), 1, 0);
+        const print_function = core.LLVMAddFunction(self.llvm_module, "print", print_function_type);
+        const print_function_entry = core.LLVMAppendBasicBlock(print_function, "entrypoint") orelse return CodeGenError.CompilationError;
+        core.LLVMPositionBuilderAtEnd(self.builder, print_function_entry);
+
+        const format_str = "%d\n";
+        const format_str_ptr = core.LLVMBuildGlobalStringPtr(self.builder, format_str, "format_str_ptr");
+
+        const arguments = @constCast(&[_]types.LLVMValueRef{
+            format_str_ptr,
+            core.LLVMGetParam(print_function, 0),
+        });
+
+        _ = core.LLVMBuildCall2(self.builder, printf_function_type, printf_function, arguments, 2, "printf_call") orelse return CodeGenError.CompilationError;
+        _ = core.LLVMBuildRetVoid(self.builder);
+
+        try self.symbol_table.put("print", try self.create_variable(.{
+            .value = print_function,
+            .type = print_function_type,
+        }));
 
         return self;
     }
@@ -134,6 +155,11 @@ pub const CodeGen = struct {
                 for (function_defintion.statements) |stmt| {
                     try self.generate_statement(stmt);
                 }
+
+                try self.symbol_table.put(variable_name, try self.create_variable(.{
+                    .value = function,
+                    .type = function_type,
+                }));
             },
             .PRIMARY_EXPRESSION => |exp| {
                 switch (exp) {
@@ -167,31 +193,20 @@ pub const CodeGen = struct {
         std.debug.assert(primary_expression == .IDENTIFIER);
         const ident = primary_expression.IDENTIFIER;
 
-        std.debug.assert(function_call_statement.arguments.len == 1);
-        const argument = function_call_statement.arguments[0];
-        std.debug.assert(argument.* == .PRIMARY_EXPRESSION);
+        var arguments = std.ArrayList(types.LLVMValueRef).init(self.arena);
 
-        const num_argument: types.LLVMValueRef = switch (argument.PRIMARY_EXPRESSION) {
-            .NUMBER => |n| core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0),
-            .IDENTIFIER => |i| core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), self.symbol_table.get(i.name).?.value, "").?,
-            else => unreachable,
-        };
+        for (function_call_statement.arguments) |argument| {
+            const num_argument: types.LLVMValueRef = switch (argument.PRIMARY_EXPRESSION) {
+                .NUMBER => |n| core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0),
+                .IDENTIFIER => |i| core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), self.symbol_table.get(i.name).?.value, "").?,
+                else => unreachable,
+            };
+            try arguments.append(num_argument);
+        }
 
-        const function_name = try std.fmt.allocPrintZ(self.arena, "{s}", .{ident.name});
-        const function = core.LLVMGetNamedFunction(self.llvm_module, function_name) orelse return CodeGenError.CompilationError;
+        const xd = self.symbol_table.get(ident.name) orelse return CodeGenError.CompilationError;
 
-        const format_str = "%d\n";
-        const format_str_ptr = core.LLVMBuildGlobalStringPtr(self.builder, format_str, "format_str_ptr");
-
-        // TODO: Can we get the type from the function name? TODO: Get it from symbol table
-        const fucntion_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{
-            core.LLVMPointerType(core.LLVMInt8Type(), 0),
-            core.LLVMInt64Type(),
-        }), 2, 0);
-
-        const arguments = @constCast(&[_]types.LLVMValueRef{ format_str_ptr, num_argument });
-
-        _ = core.LLVMBuildCall2(self.builder, fucntion_type, function, arguments, 2, "function_call") orelse return CodeGenError.CompilationError;
+        _ = core.LLVMBuildCall2(self.builder, xd.type, xd.value, @ptrCast(arguments.items), @intCast(arguments.items.len), "function_call") orelse return CodeGenError.CompilationError;
     }
 
     fn generate_return_statement(self: *CodeGen, statement: *parser.Node) !void {
