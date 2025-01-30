@@ -22,10 +22,6 @@ pub fn main() !void {
     defer arena.deinit();
 
     const source_evaluator = try evaluator.Evaluator.init(arena.allocator());
-    const source_codegen = try codegen.CodeGen.init(arena.allocator());
-    defer source_codegen.deinit() catch |err| {
-        std.debug.print("ERROR GENERATING CODE {any}\n", .{err});
-    };
 
     if (std.mem.eql(u8, path, "-i")) {
         while (true) {
@@ -51,13 +47,19 @@ pub fn main() !void {
                 source_evaluator,
                 null,
             );
-        } else try process_buf(
-            buf,
-            allocator,
-            arena.allocator(),
-            source_evaluator,
-            source_codegen,
-        );
+        } else {
+            const source_codegen = try codegen.CodeGen.init(arena.allocator());
+            defer source_codegen.deinit() catch |err| {
+                std.debug.print("ERROR GENERATING CODE {any}\n", .{err});
+            };
+            try process_buf(
+                buf,
+                allocator,
+                arena.allocator(),
+                source_evaluator,
+                source_codegen,
+            );
+        }
     }
 }
 
