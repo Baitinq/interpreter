@@ -3,7 +3,6 @@ let print_one = () => {
 	return 4;
 };
 
-
 let main = () => {
 	let y = print_one() + 2;
 

@@ -44,7 +44,7 @@ pub const CodeGen = struct {
         const printf_function_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{
             core.LLVMPointerType(core.LLVMInt8Type(), 0),
             core.LLVMInt64Type(),
-        }), 2, 0);
+        }), 2, 1);
         const printf_function = core.LLVMAddFunction(self.llvm_module, "printf", printf_function_type) orelse return CodeGenError.CompilationError;
 
         const print_function_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{core.LLVMInt64Type()}), 1, 0);
@@ -60,7 +60,7 @@ pub const CodeGen = struct {
             core.LLVMGetParam(print_function, 0),
         });
 
-        _ = core.LLVMBuildCall2(self.builder, printf_function_type, printf_function, arguments, 2, "printf_call") orelse return CodeGenError.CompilationError;
+        _ = core.LLVMBuildCall2(self.builder, printf_function_type, printf_function, arguments, 2, "") orelse return CodeGenError.CompilationError;
         _ = core.LLVMBuildRetVoid(self.builder);
 
         try self.symbol_table.put("print", try self.create_variable(.{
@@ -155,6 +155,7 @@ pub const CodeGen = struct {
 
         std.debug.assert(primary_expression == .IDENTIFIER);
         const ident = primary_expression.IDENTIFIER;
+        const xd = self.symbol_table.get(ident.name) orelse return CodeGenError.CompilationError;
 
         var arguments = std.ArrayList(types.LLVMValueRef).init(self.arena);
 
@@ -162,8 +163,6 @@ pub const CodeGen = struct {
             const arg = try self.generate_expression_value(argument);
             try arguments.append(arg.value);
         }
-
-        const xd = self.symbol_table.get(ident.name) orelse return CodeGenError.CompilationError;
 
         return core.LLVMBuildCall2(self.builder, xd.type, xd.value, @ptrCast(arguments.items), @intCast(arguments.items.len), "") orelse return CodeGenError.CompilationError;
     }
@@ -236,10 +235,10 @@ pub const CodeGen = struct {
         const main_function = self.symbol_table.get("main") orelse return CodeGenError.CompilationError;
         const main_function_return = core.LLVMBuildCall2(self.builder, main_function.type, main_function.value, &[_]types.LLVMTypeRef{}, 0, "main_call") orelse return CodeGenError.CompilationError;
 
-        const exit_func_type = core.LLVMFunctionType(core.LLVMInt8Type(), @constCast(&[_]types.LLVMTypeRef{core.LLVMInt8Type()}), 1, 0);
+        const exit_func_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{core.LLVMInt8Type()}), 1, 0);
         const exit_func = core.LLVMAddFunction(self.llvm_module, "exit", exit_func_type);
-        const exit_func_return = core.LLVMBuildCall2(self.builder, exit_func_type, exit_func, @constCast(&[_]types.LLVMValueRef{main_function_return}), 1, "exit_call");
-        _ = core.LLVMBuildRet(self.builder, exit_func_return);
+        _ = core.LLVMBuildCall2(self.builder, exit_func_type, exit_func, @constCast(&[_]types.LLVMValueRef{main_function_return}), 1, "exit_call");
+        _ = core.LLVMBuildRetVoid(self.builder);
     }
 
     fn create_variable(self: *CodeGen, variable_value: Variable) !*Variable {
