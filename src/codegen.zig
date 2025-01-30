@@ -213,12 +213,16 @@ pub const CodeGen = struct {
                 .IDENTIFIER => |i| self.symbol_table.get(i.name).?,
                 else => unreachable,
             },
-            // .ADDITIVE_EXPRESSION => |exp| {
-            //     const lhs_value = self.get_expression_value(exp.lhs);
-            //     const rhs_value = self.get_expression_value(exp.rhs);
-            //
-            //     core.LLVMBuildAdd(self.builder, lhs_value, rhs_value);
-            // },
+            .ADDITIVE_EXPRESSION => |exp| {
+                const lhs_value = try self.generate_expression_value(exp.lhs);
+                const rhs_value = try self.generate_expression_value(exp.rhs);
+
+                const xd = core.LLVMBuildAdd(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                return self.create_variable(.{
+                    .value = xd,
+                    .type = core.LLVMInt64Type(),
+                });
+            },
             else => unreachable,
         };
     }
