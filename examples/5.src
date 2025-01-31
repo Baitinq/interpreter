@@ -11,7 +11,7 @@ let foo = () => {
 let main = () => {
 	print(x);
 	let x = 2;
-	foo();
+	let y= foo();
 	print(x);
-	return x;
+	return x + y;
 };

@@ -208,9 +208,16 @@ pub const CodeGen = struct {
             },
             .PRIMARY_EXPRESSION => |primary_expression| switch (primary_expression) {
                 .NUMBER => |n| {
-                    const ptr = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), "") orelse return CodeGenError.CompilationError;
-                    _ = core.LLVMBuildStore(self.builder, core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0), ptr) orelse return CodeGenError.CompilationError;
-                    const variable = core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), ptr, "") orelse return CodeGenError.CompilationError;
+                    // Global variables
+                    var variable: types.LLVMValueRef = undefined;
+                    if (self.environment.scope_stack.items.len == 1) {
+                        variable = core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0);
+                    } else {
+                        const ptr = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), "") orelse return CodeGenError.CompilationError;
+                        _ = core.LLVMBuildStore(self.builder, core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0), ptr) orelse return CodeGenError.CompilationError;
+                        variable = core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), ptr, "") orelse return CodeGenError.CompilationError;
+                    }
+
                     return try self.create_variable(.{
                         .value = variable,
                         .type = core.LLVMInt64Type(),
