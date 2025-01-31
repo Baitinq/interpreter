@@ -1,9 +1,9 @@
-let print_one = () => {
-	print(1);
-	return 4;
-};
-
 let main = () => {
+	let print_one = () => {
+		print(1);
+		return 4;
+	};
+
 	let y = print_one() + 2;
 
 	print(y);
