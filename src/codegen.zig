@@ -11,11 +11,6 @@ pub const CodeGenError = error{
     OutOfMemory,
 };
 
-const Variable = struct {
-    type: types.LLVMTypeRef,
-    value: types.LLVMValueRef,
-};
-
 pub const CodeGen = struct {
     llvm_module: types.LLVMModuleRef,
     builder: types.LLVMBuilderRef,
@@ -185,10 +180,28 @@ pub const CodeGen = struct {
                 const builder_pos = core.LLVMGetInsertBlock(self.builder);
                 defer core.LLVMPositionBuilderAtEnd(self.builder, builder_pos);
 
-                const function_type = core.LLVMFunctionType(core.LLVMInt64Type(), &[_]types.LLVMTypeRef{}, 0, 0) orelse return CodeGenError.CompilationError;
+                var paramtypes = std.ArrayList(types.LLVMTypeRef).init(self.arena);
+                for (function_definition.parameters) |param| {
+                    std.debug.assert(param.PRIMARY_EXPRESSION == .IDENTIFIER);
+                    try paramtypes.append(core.LLVMInt64Type());
+                }
+                const function_type = core.LLVMFunctionType(core.LLVMInt64Type(), paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse return CodeGenError.CompilationError;
                 const function = core.LLVMAddFunction(self.llvm_module, "", function_type) orelse return CodeGenError.CompilationError;
                 const function_entry = core.LLVMAppendBasicBlock(function, "entrypoint") orelse return CodeGenError.CompilationError;
                 core.LLVMPositionBuilderAtEnd(self.builder, function_entry);
+
+                const params = try self.arena.alloc(types.LLVMValueRef, function_definition.parameters.len);
+                core.LLVMGetParams(function, params.ptr);
+
+                var parameters_index: usize = 0;
+                for (params) |p| {
+                    const xdd = function_definition.parameters[parameters_index];
+                    try self.environment.add_variable(xdd.PRIMARY_EXPRESSION.IDENTIFIER.name, try self.create_variable(.{
+                        .value = p,
+                        .type = core.LLVMInt64Type(),
+                    }));
+                    parameters_index += 1;
+                }
 
                 for (function_definition.statements) |stmt| {
                     try self.generate_statement(stmt);
@@ -260,6 +273,11 @@ pub const CodeGen = struct {
         variable.* = variable_value;
         return variable;
     }
+};
+
+const Variable = struct {
+    type: types.LLVMTypeRef,
+    value: types.LLVMValueRef,
 };
 
 const Scope = struct {
