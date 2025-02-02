@@ -114,6 +114,7 @@ pub const CodeGen = struct {
     }
 
     fn generate_statement(self: *CodeGen, statement: *parser.Node) CodeGenError!void {
+        errdefer std.debug.print("Error generating statement\n", .{});
         std.debug.assert(statement.* == parser.Node.STATEMENT);
 
         switch (statement.STATEMENT.statement.*) {
@@ -130,6 +131,7 @@ pub const CodeGen = struct {
     }
 
     fn generate_assignment_statement(self: *CodeGen, statement: *parser.Node) CodeGenError!void {
+        errdefer std.debug.print("Error generating assignment statement\n", .{});
         std.debug.assert(statement.* == parser.Node.ASSIGNMENT_STATEMENT);
 
         const assignment_statement = statement.ASSIGNMENT_STATEMENT;
@@ -143,6 +145,7 @@ pub const CodeGen = struct {
     }
 
     fn generate_function_call_statement(self: *CodeGen, statement: *parser.Node) CodeGenError!types.LLVMValueRef {
+        errdefer std.debug.print("Error generating function call statement\n", .{});
         std.debug.assert(statement.* == parser.Node.FUNCTION_CALL_STATEMENT);
         const function_call_statement = statement.FUNCTION_CALL_STATEMENT;
 
@@ -164,6 +167,7 @@ pub const CodeGen = struct {
     }
 
     fn generate_return_statement(self: *CodeGen, statement: *parser.Node) !void {
+        errdefer std.debug.print("Error generating return statement\n", .{});
         std.debug.assert(statement.* == parser.Node.RETURN_STATEMENT);
 
         const expression = statement.RETURN_STATEMENT.expression;
@@ -172,6 +176,7 @@ pub const CodeGen = struct {
     }
 
     fn generate_if_statement(self: *CodeGen, statement: *parser.Node) !void {
+        errdefer std.debug.print("Error generating if statement\n", .{});
         std.debug.assert(statement.* == parser.Node.IF_STATEMENT);
 
         const if_statement = statement.IF_STATEMENT;
@@ -194,6 +199,7 @@ pub const CodeGen = struct {
     }
 
     fn generate_expression_value(self: *CodeGen, expression: *parser.Node) !*Variable {
+        errdefer std.debug.print("Error generating statement value\n", .{});
         return switch (expression.*) {
             .FUNCTION_DEFINITION => |function_definition| {
                 try self.environment.create_scope();
