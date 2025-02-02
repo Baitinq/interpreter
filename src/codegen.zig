@@ -124,6 +124,7 @@ pub const CodeGen = struct {
                 _ = try self.generate_function_call_statement(@ptrCast(function_call_statement));
             },
             .RETURN_STATEMENT => |*return_statement| return try self.generate_return_statement(@ptrCast(return_statement)),
+            .IF_STATEMENT => |*if_statement| return try self.generate_if_statement(@ptrCast(if_statement)),
             else => unreachable,
         }
     }
@@ -168,6 +169,28 @@ pub const CodeGen = struct {
         const expression = statement.RETURN_STATEMENT.expression;
 
         _ = core.LLVMBuildRet(self.builder, (try self.generate_expression_value(expression)).value);
+    }
+
+    fn generate_if_statement(self: *CodeGen, statement: *parser.Node) !void {
+        std.debug.assert(statement.* == parser.Node.IF_STATEMENT);
+
+        const if_statement = statement.IF_STATEMENT;
+
+        const condition_value = try self.generate_expression_value(if_statement.condition);
+
+        const current_block = core.LLVMGetInsertBlock(self.builder);
+
+        const then_block = core.LLVMAppendBasicBlock(core.LLVMGetLastFunction(self.llvm_module), "then_block");
+        _ = core.LLVMPositionBuilderAtEnd(self.builder, then_block);
+        for (if_statement.statements) |stmt| {
+            try self.generate_statement(stmt);
+        }
+        const merge_block = core.LLVMAppendBasicBlock(core.LLVMGetLastFunction(self.llvm_module), "else_block");
+        _ = core.LLVMBuildBr(self.builder, merge_block);
+        core.LLVMPositionBuilderAtEnd(self.builder, current_block);
+
+        _ = core.LLVMBuildCondBr(self.builder, condition_value.value, then_block, merge_block);
+        core.LLVMPositionBuilderAtEnd(self.builder, merge_block);
     }
 
     fn generate_expression_value(self: *CodeGen, expression: *parser.Node) !*Variable {
