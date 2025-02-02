@@ -259,16 +259,63 @@ pub const CodeGen = struct {
                         .type = core.LLVMInt64Type(),
                     });
                 },
-                .IDENTIFIER => |i| self.environment.get_variable(i.name).?,
+                .IDENTIFIER => |i| {
+                    return self.environment.get_variable(i.name).?;
+                },
                 else => unreachable,
             },
             .ADDITIVE_EXPRESSION => |exp| {
                 const lhs_value = try self.generate_expression_value(exp.lhs);
                 const rhs_value = try self.generate_expression_value(exp.rhs);
 
-                const xd = core.LLVMBuildAdd(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                var result: types.LLVMValueRef = undefined;
+                if (exp.addition) {
+                    result = core.LLVMBuildAdd(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                } else {
+                    result = core.LLVMBuildSub(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                }
                 return self.create_variable(.{
-                    .value = xd,
+                    .value = result,
+                    .type = core.LLVMInt64Type(),
+                });
+            },
+            .MULTIPLICATIVE_EXPRESSION => |exp| {
+                const lhs_value = try self.generate_expression_value(exp.lhs);
+                const rhs_value = try self.generate_expression_value(exp.rhs);
+
+                var result: types.LLVMValueRef = undefined;
+                if (exp.multiplication) {
+                    result = core.LLVMBuildMul(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                } else {
+                    result = core.LLVMBuildSDiv(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                }
+
+                return self.create_variable(.{
+                    .value = result,
+                    .type = core.LLVMInt64Type(),
+                });
+            },
+            .UNARY_EXPRESSION => |exp| {
+                const k = try self.generate_expression_value(exp.expression);
+                std.debug.assert(!exp.negation);
+
+                //TODO: Implement
+
+                const r = core.LLVMBuildNeg(self.builder, k.value, "");
+
+                // const xd = core.LLVMBuildMul(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                return self.create_variable(.{
+                    .value = r,
+                    .type = core.LLVMInt64Type(),
+                });
+            },
+            .EQUALITY_EXPRESSION => |exp| {
+                const lhs_value = try self.generate_expression_value(exp.lhs);
+                const rhs_value = try self.generate_expression_value(exp.rhs);
+
+                const cmp = core.LLVMBuildICmp(self.builder, types.LLVMIntPredicate.LLVMIntEQ, lhs_value.value, rhs_value.value, "");
+                return self.create_variable(.{
+                    .value = cmp,
                     .type = core.LLVMInt64Type(),
                 });
             },
