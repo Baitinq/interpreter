@@ -140,7 +140,7 @@ pub const CodeGen = struct {
             std.debug.assert(self.environment.contains_variable(assignment_statement.name));
         }
 
-        const variable = try self.generate_expression_value(assignment_statement.expression);
+        const variable = try self.generate_expression_value(assignment_statement.expression, assignment_statement.name);
         try self.environment.add_variable(assignment_statement.name, variable);
     }
 
@@ -159,7 +159,7 @@ pub const CodeGen = struct {
         var arguments = std.ArrayList(types.LLVMValueRef).init(self.arena);
 
         for (function_call_statement.arguments) |argument| {
-            const arg = try self.generate_expression_value(argument);
+            const arg = try self.generate_expression_value(argument, null);
             try arguments.append(arg.value);
         }
 
@@ -172,7 +172,7 @@ pub const CodeGen = struct {
 
         const expression = statement.RETURN_STATEMENT.expression;
 
-        _ = core.LLVMBuildRet(self.builder, (try self.generate_expression_value(expression)).value);
+        _ = core.LLVMBuildRet(self.builder, (try self.generate_expression_value(expression, null)).value);
     }
 
     fn generate_if_statement(self: *CodeGen, statement: *parser.Node) !void {
@@ -181,7 +181,7 @@ pub const CodeGen = struct {
 
         const if_statement = statement.IF_STATEMENT;
 
-        const condition_value = try self.generate_expression_value(if_statement.condition);
+        const condition_value = try self.generate_expression_value(if_statement.condition, null);
 
         const current_block = core.LLVMGetInsertBlock(self.builder);
 
@@ -198,7 +198,7 @@ pub const CodeGen = struct {
         core.LLVMPositionBuilderAtEnd(self.builder, merge_block);
     }
 
-    fn generate_expression_value(self: *CodeGen, expression: *parser.Node) !*Variable {
+    fn generate_expression_value(self: *CodeGen, expression: *parser.Node, name: ?[]const u8) !*Variable {
         errdefer std.debug.print("Error generating statement value\n", .{});
         return switch (expression.*) {
             .FUNCTION_DEFINITION => |function_definition| {
@@ -218,6 +218,13 @@ pub const CodeGen = struct {
                 const function = core.LLVMAddFunction(self.llvm_module, "", function_type) orelse return CodeGenError.CompilationError;
                 const function_entry = core.LLVMAppendBasicBlock(function, "entrypoint") orelse return CodeGenError.CompilationError;
                 core.LLVMPositionBuilderAtEnd(self.builder, function_entry);
+
+                if (name != null) {
+                    try self.environment.add_variable(name.?, try self.create_variable(.{
+                        .value = function,
+                        .type = function_type,
+                    }));
+                }
 
                 const params = try self.arena.alloc(types.LLVMValueRef, function_definition.parameters.len);
                 core.LLVMGetParams(function, params.ptr);
@@ -271,8 +278,8 @@ pub const CodeGen = struct {
                 else => unreachable,
             },
             .ADDITIVE_EXPRESSION => |exp| {
-                const lhs_value = try self.generate_expression_value(exp.lhs);
-                const rhs_value = try self.generate_expression_value(exp.rhs);
+                const lhs_value = try self.generate_expression_value(exp.lhs, null);
+                const rhs_value = try self.generate_expression_value(exp.rhs, null);
 
                 var result: types.LLVMValueRef = undefined;
                 if (exp.addition) {
@@ -286,8 +293,8 @@ pub const CodeGen = struct {
                 });
             },
             .MULTIPLICATIVE_EXPRESSION => |exp| {
-                const lhs_value = try self.generate_expression_value(exp.lhs);
-                const rhs_value = try self.generate_expression_value(exp.rhs);
+                const lhs_value = try self.generate_expression_value(exp.lhs, null);
+                const rhs_value = try self.generate_expression_value(exp.rhs, null);
 
                 var result: types.LLVMValueRef = undefined;
                 if (exp.multiplication) {
@@ -302,7 +309,7 @@ pub const CodeGen = struct {
                 });
             },
             .UNARY_EXPRESSION => |exp| {
-                const k = try self.generate_expression_value(exp.expression);
+                const k = try self.generate_expression_value(exp.expression, null);
                 std.debug.assert(!exp.negation);
 
                 //TODO: Implement
@@ -316,8 +323,8 @@ pub const CodeGen = struct {
                 });
             },
             .EQUALITY_EXPRESSION => |exp| {
-                const lhs_value = try self.generate_expression_value(exp.lhs);
-                const rhs_value = try self.generate_expression_value(exp.rhs);
+                const lhs_value = try self.generate_expression_value(exp.lhs, null);
+                const rhs_value = try self.generate_expression_value(exp.rhs, null);
 
                 const cmp = core.LLVMBuildICmp(self.builder, types.LLVMIntPredicate.LLVMIntEQ, lhs_value.value, rhs_value.value, "");
                 return self.create_variable(.{
