@@ -5,6 +5,7 @@ const target_m = llvm.target_machine;
 const target = llvm.target;
 const types = llvm.types;
 const core = llvm.core;
+const analysis = llvm.analysis;
 
 pub const CodeGenError = error{
     CompilationError,
@@ -96,6 +97,8 @@ pub const CodeGen = struct {
             null,
         );
         std.debug.print("Object file generated: {s}\n", .{filename});
+
+        // _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, null);
 
         // Clean up LLVM resources
         defer core.LLVMDisposeBuilder(self.builder);
