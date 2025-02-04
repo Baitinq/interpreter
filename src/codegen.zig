@@ -1,11 +1,13 @@
 const std = @import("std");
-const parser = @import("parser.zig");
+
 const llvm = @import("llvm");
 const target_m = llvm.target_machine;
 const target = llvm.target;
 const types = llvm.types;
 const core = llvm.core;
 const analysis = llvm.analysis;
+
+const parser = @import("parser.zig");
 
 pub const CodeGenError = error{
     CompilationError,
@@ -98,7 +100,7 @@ pub const CodeGen = struct {
         );
         std.debug.print("Object file generated: {s}\n", .{filename});
 
-        // _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, null);
+        _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, null);
 
         // Clean up LLVM resources
         defer core.LLVMDisposeBuilder(self.builder);
@@ -194,7 +196,10 @@ pub const CodeGen = struct {
             try self.generate_statement(stmt);
         }
         const merge_block = core.LLVMAppendBasicBlock(core.LLVMGetLastFunction(self.llvm_module), "else_block");
-        _ = core.LLVMBuildBr(self.builder, merge_block);
+        const last_instr = core.LLVMGetLastInstruction(then_block);
+        if (core.LLVMIsATerminatorInst(last_instr) == null) {
+            _ = core.LLVMBuildBr(self.builder, merge_block);
+        }
         core.LLVMPositionBuilderAtEnd(self.builder, current_block);
 
         _ = core.LLVMBuildCondBr(self.builder, condition_value.value, then_block, merge_block);
@@ -218,7 +223,7 @@ pub const CodeGen = struct {
                     try paramtypes.append(core.LLVMInt64Type());
                 }
                 const function_type = core.LLVMFunctionType(core.LLVMInt64Type(), paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse return CodeGenError.CompilationError;
-                const function = core.LLVMAddFunction(self.llvm_module, "", function_type) orelse return CodeGenError.CompilationError;
+                const function = core.LLVMAddFunction(self.llvm_module, try std.fmt.allocPrintZ(self.arena, "{s}", .{name orelse ""}), function_type) orelse return CodeGenError.CompilationError;
                 const function_entry = core.LLVMAppendBasicBlock(function, "entrypoint") orelse return CodeGenError.CompilationError;
                 core.LLVMPositionBuilderAtEnd(self.builder, function_entry);
 
@@ -340,7 +345,7 @@ pub const CodeGen = struct {
     }
 
     fn create_entrypoint(self: *CodeGen) CodeGenError!void {
-        const start_function_type = core.LLVMFunctionType(core.LLVMInt8Type(), &[_]types.LLVMTypeRef{}, 0, 0) orelse return CodeGenError.CompilationError;
+        const start_function_type = core.LLVMFunctionType(core.LLVMVoidType(), &[_]types.LLVMTypeRef{}, 0, 0) orelse return CodeGenError.CompilationError;
         const start_function = core.LLVMAddFunction(self.llvm_module, "_start", start_function_type) orelse return CodeGenError.CompilationError;
         const start_function_entry = core.LLVMAppendBasicBlock(start_function, "entrypoint") orelse return CodeGenError.CompilationError;
         core.LLVMPositionBuilderAtEnd(self.builder, start_function_entry);
@@ -348,9 +353,13 @@ pub const CodeGen = struct {
         const main_function = self.environment.get_variable("main") orelse return CodeGenError.CompilationError;
         const main_function_return = core.LLVMBuildCall2(self.builder, main_function.type, main_function.value, &[_]types.LLVMTypeRef{}, 0, "main_call") orelse return CodeGenError.CompilationError;
 
-        const exit_func_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{core.LLVMInt8Type()}), 1, 0);
+        const exit_func_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{core.LLVMInt64Type()}), 1, 0);
         const exit_func = core.LLVMAddFunction(self.llvm_module, "exit", exit_func_type);
-        _ = core.LLVMBuildCall2(self.builder, exit_func_type, exit_func, @constCast(&[_]types.LLVMValueRef{main_function_return}), 1, "exit_call");
+        try self.environment.add_variable("exit", try self.create_variable(.{
+            .value = exit_func,
+            .type = exit_func_type,
+        }));
+        _ = core.LLVMBuildCall2(self.builder, exit_func_type, exit_func, @constCast(&[_]types.LLVMValueRef{main_function_return}), 1, "");
         _ = core.LLVMBuildRetVoid(self.builder);
     }
 
