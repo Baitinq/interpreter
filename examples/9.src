@@ -3,7 +3,7 @@ let main = () => {
 	i = !i;
 
 	if !i {
-		print(i);
+		printb(!i);
 		return 1;
 	};
 
