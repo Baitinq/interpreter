@@ -127,9 +127,7 @@ pub const CodeGen = struct {
 
         const assignment_statement = statement.ASSIGNMENT_STATEMENT;
 
-        if (!assignment_statement.is_declaration) {
-            std.debug.assert(self.environment.contains_variable(assignment_statement.name));
-        }
+        std.debug.assert(self.environment.contains_variable(assignment_statement.name) != assignment_statement.is_declaration);
 
         const variable = try self.generate_expression_value(assignment_statement.expression, assignment_statement.name);
         try self.environment.add_variable(assignment_statement.name, variable);
@@ -358,7 +356,7 @@ pub const CodeGen = struct {
                 const cmp = core.LLVMBuildICmp(self.builder, types.LLVMIntPredicate.LLVMIntEQ, lhs_value.value, rhs_value.value, "");
                 return self.create_variable(.{
                     .value = cmp,
-                    .type = core.LLVMInt64Type(),
+                    .type = core.LLVMInt1Type(),
                 });
             },
             else => unreachable,
