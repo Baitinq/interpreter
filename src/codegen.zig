@@ -129,6 +129,17 @@ pub const CodeGen = struct {
 
         std.debug.assert(self.environment.contains_variable(assignment_statement.name) != assignment_statement.is_declaration);
 
+        if (assignment_statement.is_declaration and self.environment.scope_stack.items.len > 1) {
+            const y = core.LLVMGetLastFunction(self.llvm_module);
+            core.LLVMPositionBuilderAtEnd(self.builder, core.LLVMGetEntryBasicBlock(y));
+            const x = try std.fmt.allocPrintZ(self.arena, "{s}", .{assignment_statement.name});
+            const alloca = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), x);
+            try self.environment.add_variable(assignment_statement.name, try self.create_variable(.{
+                .value = alloca,
+                .type = core.LLVMVoidType(), // This gets set to the correct type during the expression type resolution. ALTERNATIVE: Pass the alloca
+            }));
+        }
+
         const variable = try self.generate_expression_value(assignment_statement.expression, assignment_statement.name);
         try self.environment.add_variable(assignment_statement.name, variable);
     }
@@ -167,7 +178,8 @@ pub const CodeGen = struct {
 
         const expression = statement.RETURN_STATEMENT.expression;
 
-        _ = core.LLVMBuildRet(self.builder, (try self.generate_expression_value(expression, null)).value);
+        const val = try self.generate_expression_value(expression, null);
+        _ = core.LLVMBuildRet(self.builder, val.value);
     }
 
     fn generate_if_statement(self: *CodeGen, statement: *parser.Node) !void {
@@ -255,14 +267,16 @@ pub const CodeGen = struct {
             },
             .PRIMARY_EXPRESSION => |primary_expression| switch (primary_expression) {
                 .NUMBER => |n| {
-                    // Global variables
                     var variable: types.LLVMValueRef = undefined;
-                    if (self.environment.scope_stack.items.len == 1) {
-                        variable = core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0);
+                    if (name != null) {
+                        const ptr = self.environment.get_variable(name.?) orelse unreachable;
+                        const val =
+                            core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0);
+                        _ = core.LLVMBuildStore(self.builder, val, ptr.value) orelse return CodeGenError.CompilationError;
+                        ptr.type = core.LLVMInt64Type();
+                        return ptr;
                     } else {
-                        const ptr = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), "") orelse return CodeGenError.CompilationError;
-                        _ = core.LLVMBuildStore(self.builder, core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0), ptr) orelse return CodeGenError.CompilationError;
-                        variable = core.LLVMBuildLoad2(self.builder, core.LLVMInt64Type(), ptr, "") orelse return CodeGenError.CompilationError;
+                        variable = core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0);
                     }
 
                     return try self.create_variable(.{
@@ -270,21 +284,22 @@ pub const CodeGen = struct {
                         .type = core.LLVMInt64Type(),
                     });
                 },
-
                 .BOOLEAN => |b| {
                     const int_value: i64 = switch (b.value) {
                         false => 0,
                         true => 1,
                     };
 
-                    // Global variables
                     var variable: types.LLVMValueRef = undefined;
-                    if (self.environment.scope_stack.items.len == 1) {
-                        variable = core.LLVMConstInt(core.LLVMInt1Type(), @intCast(int_value), 0);
+                    if (name != null) {
+                        const ptr = self.environment.get_variable(name.?) orelse unreachable;
+                        const val =
+                            core.LLVMConstInt(core.LLVMInt1Type(), @intCast(int_value), 0);
+                        _ = core.LLVMBuildStore(self.builder, val, ptr.value) orelse return CodeGenError.CompilationError;
+                        ptr.type = core.LLVMInt1Type();
+                        return ptr;
                     } else {
-                        const ptr = core.LLVMBuildAlloca(self.builder, core.LLVMInt1Type(), "") orelse return CodeGenError.CompilationError;
-                        _ = core.LLVMBuildStore(self.builder, core.LLVMConstInt(core.LLVMInt1Type(), @intCast(int_value), 0), ptr) orelse return CodeGenError.CompilationError;
-                        variable = core.LLVMBuildLoad2(self.builder, core.LLVMInt1Type(), ptr, "") orelse return CodeGenError.CompilationError;
+                        variable = core.LLVMConstInt(core.LLVMInt1Type(), @intCast(int_value), 0);
                     }
 
                     return try self.create_variable(.{
@@ -293,7 +308,12 @@ pub const CodeGen = struct {
                     });
                 },
                 .IDENTIFIER => |i| {
-                    return self.environment.get_variable(i.name).?;
+                    const v = self.environment.get_variable(i.name).?;
+                    const varr = core.LLVMBuildLoad2(self.builder, v.type, v.value, "");
+                    return try self.create_variable(.{
+                        .value = varr,
+                        .type = v.type,
+                    });
                 },
             },
             .ADDITIVE_EXPRESSION => |exp| {
