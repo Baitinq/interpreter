@@ -355,13 +355,15 @@ pub const CodeGen = struct {
                     result = core.LLVMBuildSub(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
                 }
 
-                std.debug.assert(name != null);
+                if (name != null) {
+                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
+                    _ = core.LLVMBuildStore(self.builder, result, ptr.value);
+                    ptr.type = core.LLVMInt64Type();
 
-                const ptr = self.environment.get_variable(name.?) orelse unreachable;
-                _ = core.LLVMBuildStore(self.builder, result, ptr.value);
-                ptr.type = core.LLVMInt64Type();
-
-                return ptr;
+                    return ptr;
+                } else {
+                    return try self.create_variable(.{ .value = result, .type = core.LLVMInt64Type() });
+                }
             },
             .MULTIPLICATIVE_EXPRESSION => |exp| {
                 const lhs_value = try self.generate_expression_value(exp.lhs, null);
@@ -374,13 +376,15 @@ pub const CodeGen = struct {
                     result = core.LLVMBuildSDiv(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
                 }
 
-                std.debug.assert(name != null);
+                if (name != null) {
+                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
+                    _ = core.LLVMBuildStore(self.builder, result, ptr.value);
+                    ptr.type = core.LLVMInt64Type();
 
-                const ptr = self.environment.get_variable(name.?) orelse unreachable;
-                _ = core.LLVMBuildStore(self.builder, result, ptr.value);
-                ptr.type = core.LLVMInt64Type();
-
-                return ptr;
+                    return ptr;
+                } else {
+                    return try self.create_variable(.{ .value = result, .type = core.LLVMInt64Type() });
+                }
             },
             .UNARY_EXPRESSION => |exp| {
                 const k = try self.generate_expression_value(exp.expression, null);
