@@ -105,7 +105,7 @@ pub const Evaluator = struct {
                 std.debug.assert(primary_expression.* == .IDENTIFIER);
 
                 // Print function implementation
-                if (std.mem.eql(u8, function_call_statement.expression.PRIMARY_EXPRESSION.IDENTIFIER.name, "print")) {
+                if (std.mem.eql(u8, function_call_statement.expression.PRIMARY_EXPRESSION.IDENTIFIER.name, "print") or std.mem.eql(u8, function_call_statement.expression.PRIMARY_EXPRESSION.IDENTIFIER.name, "printb")) {
                     std.debug.assert(function_call_statement.arguments.len == 1);
                     std.debug.print("PRINT: {any}\n", .{try self.get_expression_value(function_call_statement.arguments[0])});
                     return null;
