@@ -359,6 +359,7 @@ pub const CodeGen = struct {
 
                 const ptr = self.environment.get_variable(name.?) orelse unreachable;
                 _ = core.LLVMBuildStore(self.builder, result, ptr.value);
+                ptr.type = core.LLVMInt64Type();
 
                 return ptr;
             },
@@ -377,6 +378,7 @@ pub const CodeGen = struct {
 
                 const ptr = self.environment.get_variable(name.?) orelse unreachable;
                 _ = core.LLVMBuildStore(self.builder, result, ptr.value);
+                ptr.type = core.LLVMInt64Type();
 
                 return ptr;
             },
@@ -407,10 +409,15 @@ pub const CodeGen = struct {
                 const rhs_value = try self.generate_expression_value(exp.rhs, null);
 
                 const cmp = core.LLVMBuildICmp(self.builder, types.LLVMIntPredicate.LLVMIntEQ, lhs_value.value, rhs_value.value, "");
-                return self.create_variable(.{
-                    .value = cmp,
-                    .type = core.LLVMInt1Type(),
-                });
+
+                std.debug.assert(name != null);
+
+                const ptr = self.environment.get_variable(name.?) orelse unreachable;
+
+                _ = core.LLVMBuildStore(self.builder, cmp, ptr.value);
+                ptr.type = core.LLVMInt1Type();
+
+                return ptr;
             },
             else => unreachable,
         };
