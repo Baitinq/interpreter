@@ -1,7 +1,8 @@
 let main = () => {
 	let x = 1;
 	if x == 1 {
-		x = 2;
+		x = 2 + 1;
+		print(x);
 	};
 	return x;
 };

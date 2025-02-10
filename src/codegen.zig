@@ -117,6 +117,7 @@ pub const CodeGen = struct {
             },
             .RETURN_STATEMENT => |*return_statement| return try self.generate_return_statement(@ptrCast(return_statement)),
             .IF_STATEMENT => |*if_statement| return try self.generate_if_statement(@ptrCast(if_statement)),
+            .WHILE_STATEMENT => |*while_statement| return try self.generate_while_statement(@ptrCast(while_statement)),
             else => unreachable,
         }
     }
@@ -206,6 +207,33 @@ pub const CodeGen = struct {
 
         _ = core.LLVMBuildCondBr(self.builder, condition_value.value, then_block, merge_block);
         core.LLVMPositionBuilderAtEnd(self.builder, merge_block);
+    }
+
+    fn generate_while_statement(self: *CodeGen, statement: *parser.Node) !void {
+        errdefer std.debug.print("Error generating while statement\n", .{});
+        std.debug.assert(statement.* == parser.Node.WHILE_STATEMENT);
+
+        const while_statement = statement.WHILE_STATEMENT;
+
+        const while_block = core.LLVMAppendBasicBlock(core.LLVMGetLastFunction(self.llvm_module), "while_block");
+        _ = core.LLVMBuildBr(self.builder, while_block);
+        _ = core.LLVMPositionBuilderAtEnd(self.builder, while_block);
+        const condition_value = try self.generate_expression_value(while_statement.condition, null);
+
+        const inner_block = core.LLVMAppendBasicBlock(core.LLVMGetLastFunction(self.llvm_module), "inner_block");
+        const outer_block = core.LLVMAppendBasicBlock(core.LLVMGetLastFunction(self.llvm_module), "outer_block");
+        _ = core.LLVMBuildCondBr(self.builder, condition_value.value, inner_block, outer_block);
+
+        _ = core.LLVMPositionBuilderAtEnd(self.builder, inner_block);
+        for (while_statement.statements) |stmt| {
+            try self.generate_statement(stmt);
+        }
+        const last_instr = core.LLVMGetLastInstruction(inner_block);
+        if (core.LLVMIsATerminatorInst(last_instr) == null) {
+            _ = core.LLVMBuildBr(self.builder, while_block);
+        }
+
+        core.LLVMPositionBuilderAtEnd(self.builder, outer_block);
     }
 
     fn generate_expression_value(self: *CodeGen, expression: *parser.Node, name: ?[]const u8) !*Variable {
@@ -326,10 +354,13 @@ pub const CodeGen = struct {
                 } else {
                     result = core.LLVMBuildSub(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
                 }
-                return self.create_variable(.{
-                    .value = result,
-                    .type = core.LLVMInt64Type(),
-                });
+
+                std.debug.assert(name != null);
+
+                const ptr = self.environment.get_variable(name.?) orelse unreachable;
+                _ = core.LLVMBuildStore(self.builder, result, ptr.value);
+
+                return ptr;
             },
             .MULTIPLICATIVE_EXPRESSION => |exp| {
                 const lhs_value = try self.generate_expression_value(exp.lhs, null);
@@ -342,10 +373,12 @@ pub const CodeGen = struct {
                     result = core.LLVMBuildSDiv(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
                 }
 
-                return self.create_variable(.{
-                    .value = result,
-                    .type = core.LLVMInt64Type(),
-                });
+                std.debug.assert(name != null);
+
+                const ptr = self.environment.get_variable(name.?) orelse unreachable;
+                _ = core.LLVMBuildStore(self.builder, result, ptr.value);
+
+                return ptr;
             },
             .UNARY_EXPRESSION => |exp| {
                 const k = try self.generate_expression_value(exp.expression, null);
