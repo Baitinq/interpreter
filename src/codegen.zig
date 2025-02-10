@@ -399,10 +399,19 @@ pub const CodeGen = struct {
                     },
                 }
 
-                return self.create_variable(.{
-                    .value = r,
-                    .type = t,
-                });
+                if (name != null) {
+                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
+
+                    _ = core.LLVMBuildStore(self.builder, r, ptr.value);
+                    ptr.type = t;
+
+                    return ptr;
+                } else {
+                    return try self.create_variable(.{
+                        .value = r,
+                        .type = t,
+                    });
+                }
             },
             .EQUALITY_EXPRESSION => |exp| {
                 const lhs_value = try self.generate_expression_value(exp.lhs, null);
@@ -410,14 +419,19 @@ pub const CodeGen = struct {
 
                 const cmp = core.LLVMBuildICmp(self.builder, types.LLVMIntPredicate.LLVMIntEQ, lhs_value.value, rhs_value.value, "");
 
-                std.debug.assert(name != null);
+                if (name != null) {
+                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
 
-                const ptr = self.environment.get_variable(name.?) orelse unreachable;
+                    _ = core.LLVMBuildStore(self.builder, cmp, ptr.value);
+                    ptr.type = core.LLVMInt1Type();
 
-                _ = core.LLVMBuildStore(self.builder, cmp, ptr.value);
-                ptr.type = core.LLVMInt1Type();
-
-                return ptr;
+                    return ptr;
+                } else {
+                    return try self.create_variable(.{
+                        .value = cmp,
+                        .type = core.LLVMInt1Type(),
+                    });
+                }
             },
             else => unreachable,
         };
