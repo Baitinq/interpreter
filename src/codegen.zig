@@ -260,6 +260,7 @@ pub const CodeGen = struct {
                 const function_entry = core.LLVMAppendBasicBlock(function, "entrypoint") orelse return CodeGenError.CompilationError;
                 core.LLVMPositionBuilderAtEnd(self.builder, function_entry);
 
+                // Needed for recursive functions
                 if (name != null) {
                     try self.environment.add_variable(name.?, try self.create_variable(.{
                         .value = function,
@@ -272,12 +273,17 @@ pub const CodeGen = struct {
 
                 var parameters_index: usize = 0;
                 for (params) |p| {
+                    defer parameters_index += 1;
                     const xdd = function_definition.parameters[parameters_index];
+
+                    const x = try std.fmt.allocPrintZ(self.arena, "{s}", .{xdd.PRIMARY_EXPRESSION.IDENTIFIER.name});
+                    const alloca = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), x);
+                    _ = core.LLVMBuildStore(self.builder, p, alloca);
+
                     try self.environment.add_variable(xdd.PRIMARY_EXPRESSION.IDENTIFIER.name, try self.create_variable(.{
-                        .value = p,
+                        .value = alloca,
                         .type = core.LLVMInt64Type(),
                     }));
-                    parameters_index += 1;
                 }
 
                 for (function_definition.statements) |stmt| {
@@ -290,11 +296,19 @@ pub const CodeGen = struct {
                 });
             },
             .FUNCTION_CALL_STATEMENT => |*fn_call| {
-                const r = try self.generate_function_call_statement(@ptrCast(fn_call));
-                return try self.create_variable(.{
-                    .value = r,
-                    .type = core.LLVMInt64Type(),
-                });
+                if (name != null) {
+                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
+                    const r = try self.generate_function_call_statement(@ptrCast(fn_call));
+                    _ = core.LLVMBuildStore(self.builder, r, ptr.value) orelse return CodeGenError.CompilationError;
+                    ptr.type = core.LLVMInt64Type();
+                    return ptr;
+                } else {
+                    const r = try self.generate_function_call_statement(@ptrCast(fn_call));
+                    return try self.create_variable(.{
+                        .value = r,
+                        .type = core.LLVMInt64Type(),
+                    });
+                }
             },
             .PRIMARY_EXPRESSION => |primary_expression| switch (primary_expression) {
                 .NUMBER => |n| {

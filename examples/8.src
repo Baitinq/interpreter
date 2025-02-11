@@ -13,5 +13,3 @@ let main = () => {
 	print(result);
 	return result;
 };
-
-/* TODO */
