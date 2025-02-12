@@ -1,9 +1,11 @@
 let main = () => {
 	let test = 1922;
 
-	test = 7;
+	let uwu = test;
 
-	print(test);
+	print(uwu); /* <- This is what triggers the problem */
 
-	return test;
+	return 0;
 };
+
+/* TODO */
