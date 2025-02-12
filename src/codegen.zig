@@ -130,7 +130,7 @@ pub const CodeGen = struct {
 
         std.debug.assert(self.environment.contains_variable(assignment_statement.name) != assignment_statement.is_declaration);
 
-        if (assignment_statement.is_declaration and self.environment.scope_stack.items.len > 1) {
+        if (assignment_statement.is_declaration and self.environment.scope_stack.items.len > 1 and assignment_statement.expression.* != .FUNCTION_DEFINITION) {
             const y = core.LLVMGetLastFunction(self.llvm_module);
             core.LLVMPositionBuilderAtEnd(self.builder, core.LLVMGetEntryBasicBlock(y));
             const x = try std.fmt.allocPrintZ(self.arena, "{s}", .{assignment_statement.name});
