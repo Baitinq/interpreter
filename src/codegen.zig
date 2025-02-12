@@ -128,8 +128,6 @@ pub const CodeGen = struct {
 
         const assignment_statement = statement.ASSIGNMENT_STATEMENT;
 
-        std.debug.assert(self.environment.contains_variable(assignment_statement.name) != assignment_statement.is_declaration);
-
         if (assignment_statement.is_declaration and self.environment.scope_stack.items.len > 1 and assignment_statement.expression.* != .FUNCTION_DEFINITION) {
             const x = try std.fmt.allocPrintZ(self.arena, "{s}", .{assignment_statement.name});
             const alloca = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), x);
@@ -312,6 +310,15 @@ pub const CodeGen = struct {
                 .NUMBER => |n| {
                     var variable: types.LLVMValueRef = undefined;
                     if (name != null) {
+                        const x = try std.fmt.allocPrintZ(self.arena, "{s}", .{name.?});
+                        if (self.environment.scope_stack.items.len == 1) {
+                            const ptr = try self.create_variable(.{
+                                .value = core.LLVMAddGlobal(self.llvm_module, core.LLVMInt64Type(), x),
+                                .type = core.LLVMInt64Type(),
+                            });
+                            core.LLVMSetInitializer(ptr.value, core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0));
+                            return ptr;
+                        }
                         const ptr = self.environment.get_variable(name.?) orelse unreachable;
                         const val =
                             core.LLVMConstInt(core.LLVMInt64Type(), @intCast(n.value), 0);
@@ -335,6 +342,15 @@ pub const CodeGen = struct {
 
                     var variable: types.LLVMValueRef = undefined;
                     if (name != null) {
+                        const x = try std.fmt.allocPrintZ(self.arena, "{s}", .{name.?});
+                        if (self.environment.scope_stack.items.len == 1) {
+                            const ptr = try self.create_variable(.{
+                                .value = core.LLVMAddGlobal(self.llvm_module, core.LLVMInt1Type(), x),
+                                .type = core.LLVMInt1Type(),
+                            });
+                            core.LLVMSetInitializer(ptr.value, core.LLVMConstInt(core.LLVMInt1Type(), @intCast(int_value), 0));
+                            return ptr;
+                        }
                         const ptr = self.environment.get_variable(name.?) orelse unreachable;
                         const val =
                             core.LLVMConstInt(core.LLVMInt1Type(), @intCast(int_value), 0);
