@@ -137,11 +137,8 @@ pub const CodeGen = struct {
             }));
         }
 
-        // const ptr = self.environment.get_variable(assignment_statement.name);
         const variable = try self.generate_expression_value(assignment_statement.expression, assignment_statement.name);
-        //TODO: Shouldnt we BuildStore always
         try self.environment.add_variable(assignment_statement.name, variable);
-        // _ = core.LLVMBuildStore(self.builder, variable.value, ptr.?.value);
     }
 
     fn generate_function_call_statement(self: *CodeGen, statement: *parser.Node) CodeGenError!types.LLVMValueRef {
