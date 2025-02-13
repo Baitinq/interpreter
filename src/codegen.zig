@@ -316,9 +316,15 @@ pub const CodeGen = struct {
                 },
                 .IDENTIFIER => |i| {
                     const variable = self.environment.get_variable(i.name).?;
-                    //TODO: We should only load if variables, const maybe should also be vars
-                    //TODO: FIx this
                     const loaded = core.LLVMBuildLoad2(self.builder, variable.type, variable.value, "");
+
+                    if (name != null) {
+                        const ptr = self.environment.get_variable(name.?).?;
+                        _ = core.LLVMBuildStore(self.builder, loaded, ptr.value);
+                        ptr.type = variable.type;
+                        return ptr;
+                    }
+
                     return try self.create_variable(.{
                         .value = loaded,
                         .type = variable.type,
