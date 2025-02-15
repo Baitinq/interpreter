@@ -1,9 +1,14 @@
+let print_boolean = (b: bool) => i64 {
+	printb(b);
+	return 0;
+};
+
 let main = () => i64 {
 	let i = true;
 	i = !i;
 
 	if !i {
-		printb(!i);
+		print_boolean(!i);
 		return 1;
 	};
 

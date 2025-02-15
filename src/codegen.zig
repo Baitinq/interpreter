@@ -150,8 +150,7 @@ pub const CodeGen = struct {
         switch (function_call_statement.expression.*) {
             .PRIMARY_EXPRESSION => |primary_expression| {
                 std.debug.assert(primary_expression == .IDENTIFIER);
-                const ident = primary_expression.IDENTIFIER;
-                function = self.environment.get_variable(ident.name) orelse return CodeGenError.CompilationError;
+                function = self.environment.get_variable(primary_expression.IDENTIFIER.name) orelse return CodeGenError.CompilationError;
             },
             .FUNCTION_DEFINITION => |*function_definition| {
                 function = try self.generate_expression_value(@ptrCast(function_definition), null);
@@ -246,7 +245,7 @@ pub const CodeGen = struct {
                 var paramtypes = std.ArrayList(types.LLVMTypeRef).init(self.arena);
                 for (function_definition.parameters) |param| {
                     std.debug.assert(param.PRIMARY_EXPRESSION == .IDENTIFIER);
-                    try paramtypes.append(core.LLVMInt64Type());
+                    try paramtypes.append(get_llvm_type(param.PRIMARY_EXPRESSION.IDENTIFIER.type.?));
                 }
                 const return_type = get_llvm_type(function_definition.return_type);
                 const function_type = core.LLVMFunctionType(return_type, paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse return CodeGenError.CompilationError;
@@ -269,14 +268,16 @@ pub const CodeGen = struct {
                 for (params) |p| {
                     defer parameters_index += 1;
                     const param_node = function_definition.parameters[parameters_index];
+                    std.debug.assert(param_node.* == .PRIMARY_EXPRESSION);
 
+                    const param_type = get_llvm_type(param_node.PRIMARY_EXPRESSION.IDENTIFIER.type.?);
                     // We need to alloca params because we assume all identifiers are alloca TODO:: Is this correct
-                    const alloca = core.LLVMBuildAlloca(self.builder, core.LLVMInt64Type(), try std.fmt.allocPrintZ(self.arena, "{s}", .{param_node.PRIMARY_EXPRESSION.IDENTIFIER.name}));
+                    const alloca = core.LLVMBuildAlloca(self.builder, param_type, try std.fmt.allocPrintZ(self.arena, "{s}", .{param_node.PRIMARY_EXPRESSION.IDENTIFIER.name}));
                     _ = core.LLVMBuildStore(self.builder, p, alloca);
 
                     try self.environment.add_variable(param_node.PRIMARY_EXPRESSION.IDENTIFIER.name, try self.create_variable(.{
                         .value = alloca,
-                        .type = core.LLVMInt64Type(),
+                        .type = param_type,
                     }));
                 }
 
@@ -459,6 +460,7 @@ pub const CodeGen = struct {
 
     fn get_llvm_type(type_name: []const u8) types.LLVMTypeRef {
         if (std.mem.eql(u8, type_name, "i64")) return core.LLVMInt64Type();
+        if (std.mem.eql(u8, type_name, "bool")) return core.LLVMInt1Type();
         unreachable;
     }
 
