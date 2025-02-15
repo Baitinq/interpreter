@@ -1,7 +1,7 @@
 /* HELLO! Welcome to the unnamed language */
 
-let main = () => i64 {
-	print(18);
+let main = (argc: i64) => i64 {
+	print(argc);
 	
 	return 2;
 };

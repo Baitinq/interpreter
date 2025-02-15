@@ -1,10 +1,10 @@
 let main = () => i64 {
-	let x = (a) => i64 {
+	let x = (a: i64) => i64 {
 		print(a);
 		return 1;
 	};
 
-	let y = (f) => i64 {
+	let y = (f: (i64) => i64) => i64 {
 		return f(2);
 	};
 

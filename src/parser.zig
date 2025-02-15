@@ -57,6 +57,7 @@ pub const Node = union(enum) {
         },
         IDENTIFIER: struct {
             name: []const u8,
+            type: ?[]const u8,
         },
     },
     FUNCTION_DEFINITION: struct {
@@ -174,6 +175,7 @@ pub const Parser = struct {
                 .PRIMARY_EXPRESSION = .{
                     .IDENTIFIER = .{
                         .name = try self.arena.dupe(u8, identifier.?.type.IDENTIFIER),
+                        .type = null,
                     },
                 },
             }),
@@ -370,6 +372,7 @@ pub const Parser = struct {
                 .PRIMARY_EXPRESSION = .{
                     .IDENTIFIER = .{
                         .name = try self.arena.dupe(u8, identifier_token),
+                        .type = null,
                     },
                 },
             }),
@@ -410,7 +413,7 @@ pub const Parser = struct {
         } });
     }
 
-    // FunctionParameters ::= IDENTIFIER ("," IDENTIFIER)*
+    // FunctionParameters ::= IDENTIFIER ":" IDENTIFIER ("," IDENTIFIER ":" IDENTIFIER)*
     fn parse_function_parameters(self: *Parser) ParserError![]*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function parameters {any}\n", .{self.peek_token()});
 
@@ -423,11 +426,14 @@ pub const Parser = struct {
             }
             first = false;
             const ident = self.accept_token(tokenizer.TokenType.IDENTIFIER) orelse return node_list.items;
+            _ = try self.parse_token(tokenizer.TokenType.COLON);
+            const type_ident = try self.parse_token(tokenizer.TokenType.IDENTIFIER);
 
             try node_list.append(try self.create_node(.{
                 .PRIMARY_EXPRESSION = .{
                     .IDENTIFIER = .{
                         .name = try self.arena.dupe(u8, ident.type.IDENTIFIER),
+                        .type = try self.arena.dupe(u8, type_ident.type.IDENTIFIER),
                     },
                 },
             }));

@@ -1,8 +1,8 @@
-let print_int = (n: i32) => i32 {
+let print_int = (n: i64) => i64 {
 	print(n);
 	return n;
 };
 
-let main = (argc: i32) => i32 {
+let main = (argc: i64) => i64 {
 	return print_int(argc);
 };
