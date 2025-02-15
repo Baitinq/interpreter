@@ -56,8 +56,6 @@ pub const CodeGen = struct {
     }
 
     pub fn deinit(self: *CodeGen) !void {
-        try self.create_entrypoint();
-
         // Dump module
         core.LLVMDumpModule(self.llvm_module);
 
@@ -515,25 +513,6 @@ pub const CodeGen = struct {
             .value = print_function,
             .type = print_function_type,
         }));
-    }
-
-    fn create_entrypoint(self: *CodeGen) CodeGenError!void {
-        const start_function_type = core.LLVMFunctionType(core.LLVMVoidType(), &[_]types.LLVMTypeRef{}, 0, 0) orelse return CodeGenError.CompilationError;
-        const start_function = core.LLVMAddFunction(self.llvm_module, "_start", start_function_type) orelse return CodeGenError.CompilationError;
-        const start_function_entry = core.LLVMAppendBasicBlock(start_function, "entrypoint") orelse return CodeGenError.CompilationError;
-        core.LLVMPositionBuilderAtEnd(self.builder, start_function_entry);
-
-        const main_function = self.environment.get_variable("main") orelse return CodeGenError.CompilationError;
-        const main_function_return = core.LLVMBuildCall2(self.builder, main_function.type, main_function.value, &[_]types.LLVMTypeRef{}, 0, "main_call") orelse return CodeGenError.CompilationError;
-
-        const exit_func_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{core.LLVMInt64Type()}), 1, 0);
-        const exit_func = core.LLVMAddFunction(self.llvm_module, "exit", exit_func_type);
-        try self.environment.add_variable("exit", try self.create_variable(.{
-            .value = exit_func,
-            .type = exit_func_type,
-        }));
-        _ = core.LLVMBuildCall2(self.builder, exit_func_type, exit_func, @constCast(&[_]types.LLVMValueRef{main_function_return}), 1, "");
-        _ = core.LLVMBuildRetVoid(self.builder);
     }
 
     fn create_variable(self: *CodeGen, variable_value: Variable) !*Variable {
