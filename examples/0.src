@@ -1,6 +1,6 @@
 /* HELLO! Welcome to the unnamed language */
 
-let main = () => {
+let main = () => i64 {
 	print(18);
 	
 	return 2;

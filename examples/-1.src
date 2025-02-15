@@ -1,5 +1,5 @@
 /* HELLO! Welcome to the unnamed language */
 
-let main = () => i8 {
+let main = () => i64 {
 	return 7;
 };

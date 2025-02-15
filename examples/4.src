@@ -1,5 +1,5 @@
-let main = () => {
-	let print_one = () => {
+let main = () => i64 {
+	let print_one = () => i64 {
 		print(1);
 		return 4;
 	};

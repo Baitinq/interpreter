@@ -247,7 +247,8 @@ pub const CodeGen = struct {
                     std.debug.assert(param.PRIMARY_EXPRESSION == .IDENTIFIER);
                     try paramtypes.append(core.LLVMInt64Type());
                 }
-                const function_type = core.LLVMFunctionType(core.LLVMInt64Type(), paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse return CodeGenError.CompilationError;
+                const return_type = get_llvm_type(function_definition.return_type);
+                const function_type = core.LLVMFunctionType(return_type, paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse return CodeGenError.CompilationError;
                 const function = core.LLVMAddFunction(self.llvm_module, try std.fmt.allocPrintZ(self.arena, "{s}", .{name orelse "unnamed_func"}), function_type) orelse return CodeGenError.CompilationError;
                 const function_entry = core.LLVMAppendBasicBlock(function, "entrypoint") orelse return CodeGenError.CompilationError;
                 core.LLVMPositionBuilderAtEnd(self.builder, function_entry);
@@ -453,6 +454,11 @@ pub const CodeGen = struct {
             .value = variable,
             .type = literal_type,
         });
+    }
+
+    fn get_llvm_type(type_name: []const u8) types.LLVMTypeRef {
+        if (std.mem.eql(u8, type_name, "i64")) return core.LLVMInt64Type();
+        unreachable;
     }
 
     fn create_print_function(self: *CodeGen) !void {

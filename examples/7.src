@@ -1,10 +1,10 @@
-let ten = () => {
-	return () => {
+let ten = () => i64 {
+	return () => i64 {
 		return 10;
 	}();
-};
+}; /* TODO */
 
-let main = () => {
+let main = () => i64 {
 	let i = 4;
 	
 	if (1 - -1 * 2) == 5 - (-1 + 1 + ten() / 2) + 3 {

@@ -2,16 +2,16 @@
 
 let x = 18;
 
-let foo = () => {
+let foo = () => i64 {
 	let x = 1;
 	print(x);
 	return x;
 };
 
-let main = () => {
+let main = () => i64 {
 	print(x);
 	let x = 2;
-	let y= foo();
+	let y = foo();
 	print(x);
 	return x + y;
 };

@@ -1,10 +1,10 @@
-let print_input = (input_a, input_b) => {
+let print_input = (input_a, input_b) => i64 {
 	print(input_a);
 	print(input_b);
 	return input_a + input_b;
 };
 
-let main = () => {
+let main = () => i64 {
 	let i = print_input(1,4);
 	return print_input(7, 2) + i;
 };

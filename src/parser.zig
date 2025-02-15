@@ -62,6 +62,7 @@ pub const Node = union(enum) {
     FUNCTION_DEFINITION: struct {
         statements: []*Node,
         parameters: []*Node,
+        return_type: []const u8,
     },
     RETURN_STATEMENT: struct {
         expression: *Node,
@@ -376,7 +377,7 @@ pub const Parser = struct {
         };
     }
 
-    // FunctionDefinition ::= LPAREN FunctionParamters? RPAREN ARROW LBRACE Statement* ReturnStatement RBRACE
+    // FunctionDefinition ::= LPAREN FunctionParameters? RPAREN ARROW IDENTIFIER LBRACE Statement* ReturnStatement SEMICOLON RBRACE
     fn parse_function_definition(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing function definition {any}\n", .{self.peek_token()});
 
@@ -387,6 +388,10 @@ pub const Parser = struct {
         _ = try self.parse_token(tokenizer.TokenType.RPAREN);
 
         _ = try self.parse_token(tokenizer.TokenType.ARROW);
+
+        const type_expr = try self.parse_primary_expression();
+        if (type_expr.PRIMARY_EXPRESSION != .IDENTIFIER) return ParserError.ParsingError;
+
         _ = try self.parse_token(tokenizer.TokenType.LBRACE);
 
         var nodes = std.ArrayList(*Node).init(self.arena);
@@ -401,6 +406,7 @@ pub const Parser = struct {
         return self.create_node(.{ .FUNCTION_DEFINITION = .{
             .statements = nodes.items,
             .parameters = parameters,
+            .return_type = type_expr.PRIMARY_EXPRESSION.IDENTIFIER.name,
         } });
     }
 

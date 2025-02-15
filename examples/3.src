@@ -1,4 +1,4 @@
-let main = () => {
+let main = () => i64 {
 	let seventeen = 10 + 2 + 4;
 
 	seventeen = seventeen + 1;

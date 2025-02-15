@@ -1,11 +1,9 @@
-let main = () => {
+let main = () => i64 {
 	let test = 1922;
 
 	let uwu = test;
 
-	print(uwu); /* <- This is what triggers the problem */
+	print(uwu);
 
 	return 0;
 };
-
-/* TODO */

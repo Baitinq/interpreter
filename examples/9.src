@@ -1,4 +1,4 @@
-let main = () => {
+let main = () => i64 {
 	let i = true;
 	i = !i;
 

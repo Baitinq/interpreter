@@ -26,6 +26,6 @@ UnaryExpression ::= ("!" | "-") UnaryExpression | PrimaryExpression
 
 PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | FunctionDefinition | LPAREN Expression RPAREN
 
-FunctionDefinition ::= LPAREN FunctionParameters? RPAREN ARROW LBRACE Statement* ReturnStatement SEMICOLON RBRACE
+FunctionDefinition ::= LPAREN FunctionParameters? RPAREN ARROW IDENTIFIER LBRACE Statement* ReturnStatement SEMICOLON RBRACE
 
 FunctionParameters ::= IDENTIFIER ("," IDENTIFIER)*
