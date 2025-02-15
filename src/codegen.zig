@@ -86,7 +86,10 @@ pub const CodeGen = struct {
         );
         std.debug.print("Object file generated: {s}\n", .{filename});
 
-        _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, null);
+        var message: [*c]u8 = undefined;
+        _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, &message);
+
+        std.debug.print("Verification output: {s}.\n", .{message});
 
         // Clean up LLVM resources
         defer core.LLVMDisposeBuilder(self.builder);
