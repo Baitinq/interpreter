@@ -57,13 +57,22 @@ pub const Node = union(enum) {
         },
         IDENTIFIER: struct {
             name: []const u8,
-            type: ?[]const u8,
+            type: ?*Node,
         },
     },
     FUNCTION_DEFINITION: struct {
         statements: []*Node,
         parameters: []*Node,
-        return_type: []const u8,
+        return_type: *Node,
+    },
+    TYPE: union(enum) {
+        SIMPLE_TYPE: struct {
+            name: []const u8,
+        },
+        FUNCTION_TYPE: struct {
+            parameters: []*Node,
+            return_type: *Node,
+        },
     },
     RETURN_STATEMENT: struct {
         expression: *Node,
@@ -392,8 +401,7 @@ pub const Parser = struct {
 
         _ = try self.parse_token(tokenizer.TokenType.ARROW);
 
-        const type_expr = try self.parse_primary_expression();
-        if (type_expr.PRIMARY_EXPRESSION != .IDENTIFIER) return ParserError.ParsingError;
+        const return_type = try self.parse_type();
 
         _ = try self.parse_token(tokenizer.TokenType.LBRACE);
 
@@ -409,13 +417,13 @@ pub const Parser = struct {
         return self.create_node(.{ .FUNCTION_DEFINITION = .{
             .statements = nodes.items,
             .parameters = parameters,
-            .return_type = type_expr.PRIMARY_EXPRESSION.IDENTIFIER.name,
+            .return_type = return_type,
         } });
     }
 
-    // FunctionParameters ::= IDENTIFIER ":" IDENTIFIER ("," IDENTIFIER ":" IDENTIFIER)*
+    // FunctionParameters ::= IDENTIFIER ":" Type ("," IDENTIFIER ":" Type)*
     fn parse_function_parameters(self: *Parser) ParserError![]*Node {
-        errdefer if (!self.try_context) std.debug.print("Error parsing function parameters {any}\n", .{self.peek_token()});
+        errdefer std.debug.print("Error parsing function parameters {any}\n", .{self.peek_token()});
 
         var node_list = std.ArrayList(*Node).init(self.arena);
 
@@ -426,14 +434,15 @@ pub const Parser = struct {
             }
             first = false;
             const ident = self.accept_token(tokenizer.TokenType.IDENTIFIER) orelse return node_list.items;
+
             _ = try self.parse_token(tokenizer.TokenType.COLON);
-            const type_ident = try self.parse_token(tokenizer.TokenType.IDENTIFIER);
+            const type_annotation = try self.parse_type();
 
             try node_list.append(try self.create_node(.{
                 .PRIMARY_EXPRESSION = .{
                     .IDENTIFIER = .{
                         .name = try self.arena.dupe(u8, ident.type.IDENTIFIER),
-                        .type = try self.arena.dupe(u8, type_ident.type.IDENTIFIER),
+                        .type = type_annotation,
                     },
                 },
             }));
@@ -453,6 +462,56 @@ pub const Parser = struct {
         return self.create_node(.{
             .RETURN_STATEMENT = .{
                 .expression = @constCast(expression),
+            },
+        });
+    }
+
+    // Type ::= IDENTIFIER | FunctionType
+    fn parse_type(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing type annotation {any}\n", .{self.peek_token()});
+
+        return self.accept_parse(parse_function_type) orelse switch (self.consume_token().?.type) {
+            .IDENTIFIER => |ident| {
+                //TODO: we should only accept specific type identifiers
+                return try self.create_node(.{
+                    .TYPE = .{
+                        .SIMPLE_TYPE = .{
+                            .name = try self.arena.dupe(u8, ident),
+                        },
+                    },
+                });
+            },
+            else => ParserError.ParsingError,
+        };
+    }
+
+    // FunctionType ::= LPAREN (Type ("," Type)*)? RPAREN ARROW Type
+    fn parse_function_type(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing function type {any}\n", .{self.peek_token()});
+
+        _ = try self.parse_token(tokenizer.TokenType.LPAREN);
+
+        var parameters = std.ArrayList(*Node).init(self.arena);
+        var first = true;
+        while (self.accept_parse(parse_type)) |type_annotation| {
+            if (!first) {
+                _ = try self.parse_token(tokenizer.TokenType.COMMA);
+            }
+            try parameters.append(type_annotation);
+            first = false;
+        }
+        _ = try self.parse_token(tokenizer.TokenType.RPAREN);
+
+        _ = try self.parse_token(tokenizer.TokenType.ARROW);
+
+        const return_type = try self.parse_type();
+
+        return try self.create_node(.{
+            .TYPE = .{
+                .FUNCTION_TYPE = .{
+                    .parameters = parameters.items,
+                    .return_type = return_type,
+                },
             },
         });
     }

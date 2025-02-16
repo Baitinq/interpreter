@@ -245,9 +245,9 @@ pub const CodeGen = struct {
                 var paramtypes = std.ArrayList(types.LLVMTypeRef).init(self.arena);
                 for (function_definition.parameters) |param| {
                     std.debug.assert(param.PRIMARY_EXPRESSION == .IDENTIFIER);
-                    try paramtypes.append(get_llvm_type(param.PRIMARY_EXPRESSION.IDENTIFIER.type.?));
+                    try paramtypes.append(try self.get_llvm_type(param.PRIMARY_EXPRESSION.IDENTIFIER.type.?));
                 }
-                const return_type = get_llvm_type(function_definition.return_type);
+                const return_type = try self.get_llvm_type(function_definition.return_type);
                 const function_type = core.LLVMFunctionType(return_type, paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse return CodeGenError.CompilationError;
                 const function = core.LLVMAddFunction(self.llvm_module, try std.fmt.allocPrintZ(self.arena, "{s}", .{name orelse "unnamed_func"}), function_type) orelse return CodeGenError.CompilationError;
                 const function_entry = core.LLVMAppendBasicBlock(function, "entrypoint") orelse return CodeGenError.CompilationError;
@@ -270,7 +270,7 @@ pub const CodeGen = struct {
                     const param_node = function_definition.parameters[parameters_index];
                     std.debug.assert(param_node.* == .PRIMARY_EXPRESSION);
 
-                    const param_type = get_llvm_type(param_node.PRIMARY_EXPRESSION.IDENTIFIER.type.?);
+                    const param_type = try self.get_llvm_type(param_node.PRIMARY_EXPRESSION.IDENTIFIER.type.?);
                     // We need to alloca params because we assume all identifiers are alloca TODO:: Is this correct
                     const alloca = core.LLVMBuildAlloca(self.builder, param_type, try std.fmt.allocPrintZ(self.arena, "{s}", .{param_node.PRIMARY_EXPRESSION.IDENTIFIER.name}));
                     _ = core.LLVMBuildStore(self.builder, p, alloca);
@@ -458,10 +458,26 @@ pub const CodeGen = struct {
         });
     }
 
-    fn get_llvm_type(type_name: []const u8) types.LLVMTypeRef {
-        if (std.mem.eql(u8, type_name, "i64")) return core.LLVMInt64Type();
-        if (std.mem.eql(u8, type_name, "bool")) return core.LLVMInt1Type();
-        unreachable;
+    fn get_llvm_type(self: *CodeGen, node: *parser.Node) !types.LLVMTypeRef {
+        std.debug.assert(node.* == parser.Node.TYPE);
+        const type_node = node.TYPE;
+
+        switch (type_node) {
+            .SIMPLE_TYPE => |t| {
+                if (std.mem.eql(u8, t.name, "i64")) return core.LLVMInt64Type();
+                if (std.mem.eql(u8, t.name, "bool")) return core.LLVMInt1Type();
+                unreachable;
+            },
+            // TODO: Properly handle this vv
+            .FUNCTION_TYPE => |t| {
+                const return_type = try self.get_llvm_type(t.return_type);
+                var paramtypes = std.ArrayList(types.LLVMTypeRef).init(self.arena);
+                for (t.parameters) |param| {
+                    try paramtypes.append(try self.get_llvm_type(param));
+                }
+                return core.LLVMFunctionType(return_type, paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse unreachable;
+            },
+        }
     }
 
     fn create_print_function(self: *CodeGen) !void {

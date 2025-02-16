@@ -28,4 +28,10 @@ PrimaryExpression ::= NUMBER | BOOLEAN | IDENTIFIER | FunctionCallStatement | Fu
 
 FunctionDefinition ::= LPAREN FunctionParameters? RPAREN ARROW IDENTIFIER LBRACE Statement* ReturnStatement SEMICOLON RBRACE
 
-FunctionParameters ::= IDENTIFIER ":" IDENTIFIER ("," IDENTIFIER ":" IDENTIFIER)*
+FunctionParameters ::= IDENTIFIER ":" Type ("," IDENTIFIER ":" Type)*
+
+Type ::= IDENTIFIER | FunctionType
+
+FunctionType ::= LPAREN (Type ("," Type)*)? RPAREN ARROW Type
+
+ParameterTypes ::= Type ("," Type)*
