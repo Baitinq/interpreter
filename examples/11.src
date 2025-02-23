@@ -1,12 +1,13 @@
 let main = () => i64 {
-	let x = (a: i64) => i64 {
+	let y = (f: (i64) => i64, x: i64) => i64 {
+		return f(x);
+	};
+
+	let id = (a: i64) => i64 {
 		print(a);
-		return 1;
+		print(12);
+		return a;
 	};
 
-	let y = (f: (i64) => i64) => i64 {
-		return f(2);
-	};
-
-	return y(x);
+	return y(id, 2);
 };

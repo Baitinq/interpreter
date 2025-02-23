@@ -423,7 +423,7 @@ pub const Parser = struct {
 
     // FunctionParameters ::= IDENTIFIER ":" Type ("," IDENTIFIER ":" Type)*
     fn parse_function_parameters(self: *Parser) ParserError![]*Node {
-        errdefer std.debug.print("Error parsing function parameters {any}\n", .{self.peek_token()});
+        errdefer if (!self.try_context) std.debug.print("Error parsing function parameters {any}\n", .{self.peek_token()});
 
         var node_list = std.ArrayList(*Node).init(self.arena);
 
