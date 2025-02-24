@@ -260,7 +260,6 @@ pub const CodeGen = struct {
                 const function_type = core.LLVMFunctionType(return_type, paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse return CodeGenError.CompilationError;
                 const function = core.LLVMAddFunction(self.llvm_module, try std.fmt.allocPrintZ(self.arena, "{s}", .{name orelse "unnamed_func"}), function_type) orelse return CodeGenError.CompilationError;
                 const function_entry = core.LLVMAppendBasicBlock(function, "entrypoint") orelse return CodeGenError.CompilationError;
-                core.LLVMPositionBuilderAtEnd(self.builder, function_entry);
 
                 // Needed for recursive functions
                 if (name != null) {
@@ -278,6 +277,8 @@ pub const CodeGen = struct {
                         try self.environment.add_variable(name.?, ptr.?);
                     }
                 }
+
+                core.LLVMPositionBuilderAtEnd(self.builder, function_entry);
 
                 try self.environment.create_scope();
                 defer self.environment.drop_scope();
@@ -311,6 +312,8 @@ pub const CodeGen = struct {
                     try self.generate_statement(stmt);
                 }
 
+                core.LLVMPositionBuilderAtEnd(self.builder, builder_pos);
+
                 // Global functions
                 if (self.environment.scope_stack.items.len == 2) {
                     return try self.create_variable(.{
@@ -319,11 +322,7 @@ pub const CodeGen = struct {
                         .stack_level = null,
                     });
                 }
-                core.LLVMPositionBuilderAtEnd(self.builder, builder_pos);
-                const ptr = self.environment.get_variable(name.?) orelse unreachable;
-                _ = core.LLVMBuildStore(self.builder, function, ptr.value) orelse return CodeGenError.CompilationError;
-                ptr.type = function_type;
-                return ptr;
+                return self.environment.get_variable(name.?) orelse unreachable;
             },
             .FUNCTION_CALL_STATEMENT => |*fn_call| {
                 if (name != null) {
