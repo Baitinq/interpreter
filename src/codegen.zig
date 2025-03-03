@@ -23,9 +23,10 @@ pub const CodeGen = struct {
 
     pub fn init(arena: std.mem.Allocator) !*CodeGen {
         // Initialize LLVM
-        _ = target.LLVMInitializeNativeTarget();
-        _ = target.LLVMInitializeNativeAsmPrinter();
-        _ = target.LLVMInitializeNativeAsmParser();
+        target.LLVMInitializeAllTargetInfos();
+        _ = target.LLVMInitializeAllTargets();
+        _ = target.LLVMInitializeAllAsmPrinters();
+        _ = target.LLVMInitializeAllAsmParsers();
 
         const module: types.LLVMModuleRef = core.LLVMModuleCreateWithName("module");
         const builder = core.LLVMCreateBuilder();
@@ -63,7 +64,10 @@ pub const CodeGen = struct {
         // Generate code
         const triple = target_m.LLVMGetDefaultTargetTriple();
         var target_ref: types.LLVMTargetRef = undefined;
-        _ = target_m.LLVMGetTargetFromTriple(triple, &target_ref, null);
+        var message: [*c]u8 = undefined;
+        _ = target_m.LLVMGetTargetFromTriple(triple, &target_ref, &message);
+        std.debug.print("Target output: {s}.\n", .{message});
+        core.LLVMDisposeMessage(message);
         const target_machine = target_m.LLVMCreateTargetMachine(
             target_ref,
             triple,
@@ -85,7 +89,6 @@ pub const CodeGen = struct {
         );
         std.debug.print("Object file generated: {s}\n", .{filename});
 
-        var message: [*c]u8 = undefined;
         _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, &message);
         std.debug.print("Verification output: {s}.\n", .{message});
         core.LLVMDisposeMessage(message);
