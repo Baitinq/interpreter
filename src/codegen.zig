@@ -1,11 +1,19 @@
 const std = @import("std");
 
-const llvm = @import("llvm");
-const target_m = llvm.target_machine;
-const target = llvm.target;
-const types = llvm.types;
-const core = llvm.core;
-const analysis = llvm.analysis;
+const llvm = @cImport({
+    @cInclude("llvm-c/Core.h");
+    @cInclude("llvm-c/TargetMachine.h");
+    @cInclude("llvm-c/Types.h");
+    @cInclude("llvm-c/Analysis.h");
+    @cInclude("llvm-c/Target.h");
+});
+
+// Create aliases for clarity
+const core = llvm;
+const target_m = llvm;
+const types = llvm;
+const analysis = llvm;
+const target = llvm;
 
 const parser = @import("parser.zig");
 
@@ -73,9 +81,9 @@ pub const CodeGen = struct {
             triple,
             "",
             "",
-            types.LLVMCodeGenOptLevel.LLVMCodeGenLevelDefault,
-            types.LLVMRelocMode.LLVMRelocDefault,
-            types.LLVMCodeModel.LLVMCodeModelDefault,
+            types.LLVMCodeGenLevelDefault,
+            types.LLVMRelocDefault,
+            types.LLVMCodeModelDefault,
         );
 
         // Generate the object file
@@ -84,12 +92,12 @@ pub const CodeGen = struct {
             target_machine,
             self.llvm_module,
             filename,
-            types.LLVMCodeGenFileType.LLVMObjectFile,
+            types.LLVMObjectFile,
             null,
         );
         std.debug.print("Object file generated: {s}\n", .{filename});
 
-        _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, &message);
+        _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMAbortProcessAction, &message);
         std.debug.print("Verification output: {s}.\n", .{message});
         core.LLVMDisposeMessage(message);
 
@@ -358,7 +366,7 @@ pub const CodeGen = struct {
                 .IDENTIFIER => |i| {
                     const variable = self.environment.get_variable(i.name).?;
                     var param_type = variable.type;
-                    if (core.LLVMGetTypeKind(param_type.?) == types.LLVMTypeKind.LLVMFunctionTypeKind) {
+                    if (core.LLVMGetTypeKind(param_type.?) == types.LLVMFunctionTypeKind) {
                         param_type = core.LLVMPointerType(param_type.?, 0);
                     }
                     const loaded = core.LLVMBuildLoad2(self.builder, param_type, variable.value, "");
@@ -435,7 +443,7 @@ pub const CodeGen = struct {
                 switch (exp.negation) {
                     true => {
                         std.debug.assert(k.type == core.LLVMInt1Type());
-                        r = core.LLVMBuildICmp(self.builder, types.LLVMIntPredicate.LLVMIntEQ, k.value, core.LLVMConstInt(core.LLVMInt1Type(), 0, 0), "");
+                        r = core.LLVMBuildICmp(self.builder, types.LLVMIntEQ, k.value, core.LLVMConstInt(core.LLVMInt1Type(), 0, 0), "");
                         t = core.LLVMInt1Type();
                     },
                     false => {
@@ -463,7 +471,7 @@ pub const CodeGen = struct {
                 const lhs_value = try self.generate_expression_value(exp.lhs, null);
                 const rhs_value = try self.generate_expression_value(exp.rhs, null);
 
-                const cmp = core.LLVMBuildICmp(self.builder, types.LLVMIntPredicate.LLVMIntEQ, lhs_value.value, rhs_value.value, "");
+                const cmp = core.LLVMBuildICmp(self.builder, types.LLVMIntEQ, lhs_value.value, rhs_value.value, "");
 
                 if (name != null) {
                     const ptr = self.environment.get_variable(name.?) orelse unreachable;

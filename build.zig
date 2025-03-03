@@ -26,8 +26,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const llvm_zig = b.dependency("llvm-zig", .{});
-    exe_mod.addImport("llvm", llvm_zig.module("llvm"));
+    exe_mod.linkSystemLibrary("llvm", .{});
 
     // This creates another `std.Build.Step.Compile`, but this one builds an executable
     // rather than a static library.

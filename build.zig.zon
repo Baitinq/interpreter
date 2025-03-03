@@ -17,17 +17,6 @@
     // with this value.
     //.minimum_zig_version = "0.11.0",
 
-    // This field is optional.
-    // Each dependency must either provide a `url` and `hash`, or a `path`.
-    // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
-    // Once all dependencies are fetched, `zig build` no longer requires
-    // internet connectivity.
-    .dependencies = .{
-        .@"llvm-zig" = .{
-            .url = "git+https://github.com/kassane/llvm-zig/?ref=HEAD#6ce7ef4efcd9ef07e0ad98c37378e8828a8eb5d8",
-            .hash = "122031a83c60af77e52e9a958e16ececdec5c4c3a13390463b4e5823cfb35f31228f",
-        },
-    },
     .paths = .{
         "build.zig",
         "build.zig.zon",
