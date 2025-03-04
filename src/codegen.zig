@@ -43,8 +43,7 @@ pub const CodeGen = struct {
 
         const printf_function_type = core.LLVMFunctionType(core.LLVMVoidType(), @constCast(&[_]types.LLVMTypeRef{
             core.LLVMPointerType(core.LLVMInt8Type(), 0),
-            core.LLVMInt64Type(),
-        }), 2, 1);
+        }), 1, 1);
         const printf_function = core.LLVMAddFunction(self.llvm_module, "printf", printf_function_type) orelse return CodeGenError.CompilationError;
         try self.environment.add_variable("printf", try self.create_variable(.{
             .value = printf_function,
