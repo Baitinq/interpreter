@@ -27,9 +27,10 @@
         buildInputs = with pkgs; [
             zig.packages."${system}".master
             zls.packages."${system}".default
-            llvmPackages_18.libllvm
-            gdb
-            gf
+            # llvmPackages_19.libllvm
+            llvmPackages.llvm
+            # gdb
+            # gf
         ];
       };
   in {

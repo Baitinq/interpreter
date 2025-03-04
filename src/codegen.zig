@@ -24,9 +24,10 @@ pub const CodeGen = struct {
     pub fn init(arena: std.mem.Allocator) !*CodeGen {
         // Initialize LLVM
         target.LLVMInitializeAllTargetInfos();
-        _ = target.LLVMInitializeAllTargets();
-        _ = target.LLVMInitializeAllAsmPrinters();
-        _ = target.LLVMInitializeAllAsmParsers();
+        target.LLVMInitializeAllTargetMCs();
+        target.LLVMInitializeAllTargets();
+        target.LLVMInitializeAllAsmPrinters();
+        target.LLVMInitializeAllAsmParsers();
 
         const module: types.LLVMModuleRef = core.LLVMModuleCreateWithName("module");
         const builder = core.LLVMCreateBuilder();
@@ -64,10 +65,11 @@ pub const CodeGen = struct {
         // Generate code
         const triple = target_m.LLVMGetDefaultTargetTriple();
         var target_ref: types.LLVMTargetRef = undefined;
-        var message: [*c]u8 = undefined;
-        _ = target_m.LLVMGetTargetFromTriple(triple, &target_ref, &message);
-        std.debug.print("Target output: {s}.\n", .{message});
-        core.LLVMDisposeMessage(message);
+        var message: ?[*c]u8 = undefined;
+        const xd = target_m.LLVMGetTargetFromTriple(triple, &target_ref, &message.?);
+        std.debug.print("XD: {any}.\n", .{xd});
+        // std.debug.print("Target output: {any}.\n", .{message});
+        // core.LLVMDisposeMessage(message);
         const target_machine = target_m.LLVMCreateTargetMachine(
             target_ref,
             triple,
@@ -89,9 +91,9 @@ pub const CodeGen = struct {
         );
         std.debug.print("Object file generated: {s}\n", .{filename});
 
-        _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, &message);
-        std.debug.print("Verification output: {s}.\n", .{message});
-        core.LLVMDisposeMessage(message);
+        _ = analysis.LLVMVerifyModule(self.llvm_module, types.LLVMVerifierFailureAction.LLVMAbortProcessAction, &message.?);
+        // std.debug.print("Verification output: {any}.\n", .{message});
+        // core.LLVMDisposeMessage(message);
 
         // Clean up LLVM resources
         defer core.LLVMDisposeBuilder(self.builder);
