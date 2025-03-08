@@ -16,7 +16,7 @@ FunctionArguments ::= Expression ("," Expression)*
 
 Expression ::= EqualityExpression | AdditiveExpression
 
-EqualityExpression ::= AdditiveExpression "==" AdditiveExpression
+EqualityExpression ::= AdditiveExpression ("==" | "<" | ">") AdditiveExpression
 
 AdditiveExpression ::= MultiplicativeExpression (("+" | "-") MultiplicativeExpression)*
 

@@ -307,6 +307,7 @@ pub const CodeGen = struct {
                     try self.generate_statement(stmt);
                 }
 
+                // TODO: This should be done with a defer when `builder_pos` is declared, but for some reason it doesn't work
                 core.LLVMPositionBuilderAtEnd(self.builder, builder_pos);
 
                 // Global functions
@@ -358,18 +359,7 @@ pub const CodeGen = struct {
                     }
                     const loaded = core.LLVMBuildLoad2(self.builder, param_type, variable.value, "");
 
-                    if (name != null) {
-                        const ptr = self.environment.get_variable(name.?).?;
-                        _ = core.LLVMBuildStore(self.builder, loaded, ptr.value);
-                        ptr.type = variable.type;
-                        return ptr;
-                    }
-
-                    return try self.create_variable(.{
-                        .value = loaded,
-                        .type = variable.type,
-                        .stack_level = null,
-                    });
+                    return self.generate_literal(loaded, variable.type, name);
                 },
             },
             .ADDITIVE_EXPRESSION => |exp| {
@@ -383,19 +373,7 @@ pub const CodeGen = struct {
                     result = core.LLVMBuildSub(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
                 }
 
-                if (name != null) {
-                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
-                    _ = core.LLVMBuildStore(self.builder, result, ptr.value);
-                    ptr.type = core.LLVMInt64Type();
-
-                    return ptr;
-                } else {
-                    return try self.create_variable(.{
-                        .value = result,
-                        .type = core.LLVMInt64Type(),
-                        .stack_level = null,
-                    });
-                }
+                return self.generate_literal(result, core.LLVMInt64Type(), name);
             },
             .MULTIPLICATIVE_EXPRESSION => |exp| {
                 const lhs_value = try self.generate_expression_value(exp.lhs, null);
@@ -408,19 +386,7 @@ pub const CodeGen = struct {
                     result = core.LLVMBuildSDiv(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
                 }
 
-                if (name != null) {
-                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
-                    _ = core.LLVMBuildStore(self.builder, result, ptr.value);
-                    ptr.type = core.LLVMInt64Type();
-
-                    return ptr;
-                } else {
-                    return try self.create_variable(.{
-                        .value = result,
-                        .type = core.LLVMInt64Type(),
-                        .stack_level = null,
-                    });
-                }
+                return self.generate_literal(result, core.LLVMInt64Type(), name);
             },
             .UNARY_EXPRESSION => |exp| {
                 const k = try self.generate_expression_value(exp.expression, null);
@@ -439,48 +405,26 @@ pub const CodeGen = struct {
                     },
                 }
 
-                if (name != null) {
-                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
-
-                    _ = core.LLVMBuildStore(self.builder, r, ptr.value);
-                    ptr.type = t;
-
-                    return ptr;
-                } else {
-                    return try self.create_variable(.{
-                        .value = r,
-                        .type = t,
-                        .stack_level = null,
-                    });
-                }
+                return self.generate_literal(r, t, name);
             },
             .EQUALITY_EXPRESSION => |exp| {
                 const lhs_value = try self.generate_expression_value(exp.lhs, null);
                 const rhs_value = try self.generate_expression_value(exp.rhs, null);
 
-                const cmp = core.LLVMBuildICmp(self.builder, types.LLVMIntPredicate.LLVMIntEQ, lhs_value.value, rhs_value.value, "");
+                const op = switch (exp.typ) {
+                    .EQ => types.LLVMIntPredicate.LLVMIntEQ,
+                    .LT => types.LLVMIntPredicate.LLVMIntSLT,
+                    .GT => types.LLVMIntPredicate.LLVMIntSGT,
+                };
+                const cmp = core.LLVMBuildICmp(self.builder, op, lhs_value.value, rhs_value.value, "");
 
-                if (name != null) {
-                    const ptr = self.environment.get_variable(name.?) orelse unreachable;
-
-                    _ = core.LLVMBuildStore(self.builder, cmp, ptr.value);
-                    ptr.type = core.LLVMInt1Type();
-
-                    return ptr;
-                } else {
-                    return try self.create_variable(.{
-                        .value = cmp,
-                        .type = core.LLVMInt1Type(),
-                        .stack_level = null,
-                    });
-                }
+                return self.generate_literal(cmp, core.LLVMInt1Type(), name);
             },
             else => unreachable,
         };
     }
 
     fn generate_literal(self: *CodeGen, literal_val: types.LLVMValueRef, literal_type: types.LLVMTypeRef, name: ?[]const u8) !*Variable {
-        var variable: types.LLVMValueRef = undefined;
         if (name != null) {
             if (self.environment.scope_stack.items.len == 1) {
                 const ptr = try self.create_variable(.{
@@ -495,12 +439,10 @@ pub const CodeGen = struct {
             _ = core.LLVMBuildStore(self.builder, literal_val, ptr.value) orelse return CodeGenError.CompilationError;
             ptr.type = literal_type;
             return ptr;
-        } else {
-            variable = literal_val;
         }
 
         return try self.create_variable(.{
-            .value = variable,
+            .value = literal_val,
             .type = literal_type,
             .stack_level = null,
         });
