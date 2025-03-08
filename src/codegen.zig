@@ -158,9 +158,7 @@ pub const CodeGen = struct {
             .PRIMARY_EXPRESSION => |primary_expression| {
                 std.debug.assert(primary_expression == .IDENTIFIER);
                 function = self.environment.get_variable(primary_expression.IDENTIFIER.name) orelse return CodeGenError.CompilationError;
-                std.debug.print("STACK LVEL: {any} {s}\n", .{ function.stack_level.?, primary_expression.IDENTIFIER.name });
-                if (function.stack_level.? > 0) {
-                    std.debug.print("NOT GLOBAL FN! {s} {any}\n", .{ primary_expression.IDENTIFIER.name, function.stack_level });
+                if (core.LLVMGetValueKind(function.value) != types.LLVMValueKind.LLVMFunctionValueKind) {
                     function.value = core.LLVMBuildLoad2(self.builder, core.LLVMPointerType(function.type, 0), function.value, "");
                 }
             },
