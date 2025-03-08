@@ -25,6 +25,7 @@ pub const TokenType = union(enum) {
     MINUS: void,
     MUL: void,
     DIV: void,
+    MOD: void,
     BANG: void,
     LESS: void,
     GREATER: void,
@@ -85,6 +86,7 @@ pub const Tokenizer = struct {
         if (self.accept_string("-")) return self.create_token(.{ .MINUS = void{} });
         if (self.accept_string("*")) return self.create_token(.{ .MUL = void{} });
         if (self.accept_string("/")) return self.create_token(.{ .DIV = void{} });
+        if (self.accept_string("%")) return self.create_token(.{ .MOD = void{} });
         if (self.accept_string("!")) return self.create_token(.{ .BANG = void{} });
         if (self.accept_string("<")) return self.create_token(.{ .LESS = void{} });
         if (self.accept_string(">")) return self.create_token(.{ .GREATER = void{} });

@@ -37,9 +37,9 @@ pub const Node = union(enum) {
         rhs: *Node,
     },
     MULTIPLICATIVE_EXPRESSION: struct {
-        multiplication: bool,
         lhs: *Node,
         rhs: *Node,
+        typ: MultiplicativeExpressionType,
     },
     UNARY_EXPRESSION: struct {
         negation: bool,
@@ -80,6 +80,12 @@ pub const EqualityExpressionType = enum {
     EQ,
     LT,
     GT,
+};
+
+pub const MultiplicativeExpressionType = enum {
+    MUL,
+    DIV,
+    MOD,
 };
 
 pub const Parser = struct {
@@ -328,24 +334,30 @@ pub const Parser = struct {
         return lhs;
     }
 
-    // MultiplicativeExpression ::= UnaryExpression (("*" | "/") UnaryExpression)*
+    // MultiplicativeExpression ::= UnaryExpression (("*" | "/" | "%") UnaryExpression)*
     fn parse_multiplicative_expression(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing additive expression {any}\n", .{self.peek_token()});
 
         var lhs = try self.parse_unary_expression();
 
         while (true) {
-            const mul = self.accept_token(tokenizer.TokenType.MUL);
-            const div = self.accept_token(tokenizer.TokenType.DIV);
-
-            if (mul == null and div == null) break;
+            var typ: MultiplicativeExpressionType = undefined;
+            if (self.accept_token(tokenizer.TokenType.MUL) != null) {
+                typ = .MUL;
+            } else if (self.accept_token(tokenizer.TokenType.DIV) != null) {
+                typ = .DIV;
+            } else if (self.accept_token(tokenizer.TokenType.MOD) != null) {
+                typ = .MOD;
+            } else {
+                break;
+            }
 
             const rhs = try self.parse_unary_expression();
 
             lhs = try self.create_node(.{ .MULTIPLICATIVE_EXPRESSION = .{
-                .multiplication = mul != null,
                 .lhs = lhs,
                 .rhs = rhs,
+                .typ = typ,
             } });
         }
 

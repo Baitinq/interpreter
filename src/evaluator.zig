@@ -177,8 +177,11 @@ pub const Evaluator = struct {
                 const lhs = try self.get_expression_value(x.lhs) orelse return EvaluatorError.EvaluationError;
                 const rhs = try self.get_expression_value(x.rhs) orelse return EvaluatorError.EvaluationError;
                 std.debug.assert(lhs.* == .NUMBER and rhs.* == .NUMBER);
-                if (x.multiplication) return try self.create_variable(.{ .NUMBER = lhs.NUMBER * rhs.NUMBER });
-                return try self.create_variable(.{ .NUMBER = @divFloor(lhs.NUMBER, rhs.NUMBER) });
+                switch (x.typ) {
+                    .MUL => return try self.create_variable(.{ .NUMBER = lhs.NUMBER * rhs.NUMBER }),
+                    .DIV => return try self.create_variable(.{ .NUMBER = @divFloor(lhs.NUMBER, rhs.NUMBER) }),
+                    .MOD => return try self.create_variable(.{ .NUMBER = @rem(lhs.NUMBER, rhs.NUMBER) }),
+                }
             },
             .UNARY_EXPRESSION => |x| {
                 const val = try self.get_expression_value(x.expression) orelse return EvaluatorError.EvaluationError;
@@ -193,7 +196,11 @@ pub const Evaluator = struct {
                 const lhs = try self.get_expression_value(x.lhs) orelse return EvaluatorError.EvaluationError;
                 const rhs = try self.get_expression_value(x.rhs) orelse return EvaluatorError.EvaluationError;
                 std.debug.assert(lhs.* == .NUMBER and rhs.* == .NUMBER); //TODO: Generic
-                return try self.create_variable(.{ .BOOLEAN = (lhs.NUMBER == rhs.NUMBER) });
+                switch (x.typ) {
+                    .EQ => return try self.create_variable(.{ .BOOLEAN = (lhs.NUMBER == rhs.NUMBER) }),
+                    .GT => return try self.create_variable(.{ .BOOLEAN = (lhs.NUMBER > rhs.NUMBER) }),
+                    .LT => return try self.create_variable(.{ .BOOLEAN = (lhs.NUMBER < rhs.NUMBER) }),
+                }
             },
             .PRIMARY_EXPRESSION => |x| {
                 switch (x) {

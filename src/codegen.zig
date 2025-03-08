@@ -380,10 +380,16 @@ pub const CodeGen = struct {
                 const rhs_value = try self.generate_expression_value(exp.rhs, null);
 
                 var result: types.LLVMValueRef = undefined;
-                if (exp.multiplication) {
-                    result = core.LLVMBuildMul(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
-                } else {
-                    result = core.LLVMBuildSDiv(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                switch (exp.typ) {
+                    .MUL => {
+                        result = core.LLVMBuildMul(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                    },
+                    .DIV => {
+                        result = core.LLVMBuildSDiv(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                    },
+                    .MOD => {
+                        result = core.LLVMBuildSRem(self.builder, lhs_value.value, rhs_value.value, "") orelse return CodeGenError.CompilationError;
+                    },
                 }
 
                 return self.generate_literal(result, core.LLVMInt64Type(), name);
