@@ -262,28 +262,21 @@ pub const CodeGen = struct {
                 const function_type = core.LLVMFunctionType(return_type, paramtypes.items.ptr, @intCast(paramtypes.items.len), 0) orelse return CodeGenError.CompilationError;
                 const function = core.LLVMAddFunction(self.llvm_module, try std.fmt.allocPrintZ(self.arena, "{s}", .{name orelse "unnamed_func"}), function_type) orelse return CodeGenError.CompilationError;
                 const function_entry = core.LLVMAppendBasicBlock(function, "entrypoint") orelse return CodeGenError.CompilationError;
-
-                // Needed for recursive functions
-                if (name != null) {
-                    const ptr = self.environment.get_variable(name.?);
-                    // Global fn
-                    if (ptr == null) {
-                        try self.environment.add_variable(name.?, try self.create_variable(.{
-                            .value = function,
-                            .type = function_type,
-                            .stack_level = null,
-                        }));
-                    } else {
-                        _ = core.LLVMBuildStore(self.builder, function, ptr.?.value) orelse return CodeGenError.CompilationError;
-                        ptr.?.type = function_type;
-                        try self.environment.add_variable(name.?, ptr.?);
-                    }
-                }
-
                 core.LLVMPositionBuilderAtEnd(self.builder, function_entry);
 
                 try self.environment.create_scope();
                 defer self.environment.drop_scope();
+
+                const ptr = self.environment.get_variable(name.?);
+
+                // Needed for recursive functions
+                if (name != null) {
+                    try self.environment.add_variable(name.?, try self.create_variable(.{
+                        .value = function,
+                        .type = function_type,
+                        .stack_level = null,
+                    }));
+                }
 
                 const params = try self.arena.alloc(types.LLVMValueRef, function_definition.parameters.len);
                 core.LLVMGetParams(function, params.ptr);
@@ -324,7 +317,10 @@ pub const CodeGen = struct {
                         .stack_level = null,
                     });
                 }
-                return self.environment.get_variable(name.?) orelse unreachable;
+
+                _ = core.LLVMBuildStore(self.builder, function, ptr.?.value) orelse return CodeGenError.CompilationError;
+                ptr.?.type = function_type;
+                return ptr.?;
             },
             .FUNCTION_CALL_STATEMENT => |*fn_call| {
                 if (name != null) {
