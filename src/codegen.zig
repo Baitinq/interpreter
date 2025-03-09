@@ -203,7 +203,7 @@ pub const CodeGen = struct {
         for (if_statement.statements) |stmt| {
             try self.generate_statement(stmt);
         }
-        const merge_block = core.LLVMAppendBasicBlock(core.LLVMGetLastFunction(self.llvm_module), "else_block");
+        const merge_block = core.LLVMAppendBasicBlock(core.LLVMGetLastFunction(self.llvm_module), "merge_block");
         const last_instr = core.LLVMGetLastInstruction(then_block);
         if (core.LLVMIsATerminatorInst(last_instr) == null) {
             _ = core.LLVMBuildBr(self.builder, merge_block);
@@ -233,10 +233,8 @@ pub const CodeGen = struct {
         for (while_statement.statements) |stmt| {
             try self.generate_statement(stmt);
         }
-        const last_instr = core.LLVMGetLastInstruction(inner_block);
-        if (core.LLVMIsATerminatorInst(last_instr) == null) {
-            _ = core.LLVMBuildBr(self.builder, while_block);
-        }
+
+        _ = core.LLVMBuildBr(self.builder, while_block);
 
         core.LLVMPositionBuilderAtEnd(self.builder, outer_block);
     }

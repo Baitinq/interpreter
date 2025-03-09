@@ -6,9 +6,11 @@ let main = () => i64 {
 		counter = counter + 1;
 	};
 
-	while counter % 3 == 0 {
-		print(0);
+	while true {
+		if counter == 10 {
+			return counter;
+		};
 	};
 
-	return counter;
+	return 1;
 };
