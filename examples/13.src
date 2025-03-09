@@ -1,0 +1,31 @@
+let main = () => i64 {
+    /* Iterative Fibonacci using while loop. */
+    let fibonacci_iter = (n: i64) => i64 {
+        let a = 0;
+        let b = 1;
+        let i = 0;
+        while i < n {
+            let temp = b;
+            b = a + b;
+            a = temp;
+            i = i + 1;
+        };
+        return a;
+    };
+
+    /* Recursive GCD using Euclid's algorithm. */
+    let gcd = (a: i64, b: i64) => i64 {
+        if b == 0 {
+            return a;
+        };
+        return gcd(b, a % b);
+    };
+
+    let fib_val = fibonacci_iter(10);
+    print(fib_val);
+
+    let gcd_val = gcd(48, 18);
+    print(gcd_val);
+
+    return 0;
+};

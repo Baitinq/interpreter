@@ -1,8 +1,38 @@
-let print_int = (n: i64) => i64 {
-	print(n);
-	return n;
-};
+let main = () => i64 {
+    let factorial = (n: i64) => i64 {
+        let f = (acc: i64, n: i64) => i64 {
+            if n == 0 {
+                return acc;
+            };
+            return f(acc * n, n - 1);
+        };
+        return f(1, n);
+    };
 
-let main = (argc: i64) => i64 {
-	return print_int(argc);
+    let is_even = (n: i64) => bool {
+        if n % 2 == 0 {
+            return true;
+        };
+        return false;
+    };
+
+    let sum_if = (predicate: (i64) => bool, limit: i64) => i64 {
+        let sum = 0;
+        let i = 0;
+        while i < limit {
+            if predicate(i) {
+                sum = sum + i;
+            };
+            i = i + 1;
+        };
+        return sum;
+    };
+
+    let fact_val = factorial(6);
+    print(fact_val);
+
+    let even_sum = sum_if(is_even, 20);
+    print(even_sum);
+
+    return 0;
 };
