@@ -142,7 +142,7 @@ pub const Parser = struct {
         });
     }
 
-    // AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
+    // AssignmentStatement ::= "let" IDENTIFIER EQUALS (Expression | Type)
     fn parse_assignment_statement(self: *Parser) ParserError!*Node {
         errdefer if (!self.try_context) std.debug.print("Error parsing assignment statement {any}\n", .{self.peek_token()});
 
@@ -155,13 +155,23 @@ pub const Parser = struct {
 
         _ = try self.parse_token(tokenizer.TokenType.EQUALS);
 
-        const expression = try self.parse_expression();
+        if (self.accept_parse(parse_expression)) |expression| {
+            return self.create_node(.{
+                .ASSIGNMENT_STATEMENT = .{
+                    .is_declaration = is_declaration,
+                    .name = try self.arena.dupe(u8, identifier.type.IDENTIFIER),
+                    .expression = @constCast(expression),
+                },
+            });
+        }
+
+        const typ = try self.parse_type();
 
         return self.create_node(.{
             .ASSIGNMENT_STATEMENT = .{
                 .is_declaration = is_declaration,
                 .name = try self.arena.dupe(u8, identifier.type.IDENTIFIER),
-                .expression = @constCast(expression),
+                .expression = @constCast(typ),
             },
         });
     }

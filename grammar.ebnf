@@ -2,7 +2,7 @@ Program      ::= Statement+
 
 Statement    ::= (AssignmentStatement | FunctionCallStatement | IfStatement | WhileStatement | ReturnStatement) SEMICOLON
 
-AssignmentStatement ::= "let" IDENTIFIER EQUALS Expression
+AssignmentStatement ::= "let" IDENTIFIER EQUALS (Expression | Type)
 
 FunctionCallStatement ::= (IDENTIFIER | FunctionDefinition) LPAREN FunctionArguments? RPAREN
 
