@@ -6,6 +6,7 @@ const TokenizerError = error{
 
 pub const TokenType = union(enum) {
     // Keywords
+    IMPORT: void,
     LET: void,
     EXTERN: void,
     IF: void,
@@ -70,6 +71,8 @@ pub const Tokenizer = struct {
         self.skip_whitespace();
 
         if (self.offset >= self.buf.len) return null;
+
+        if (self.accept_string("import")) return self.create_token(.{ .IMPORT = void{} });
 
         if (self.accept_string("let")) return self.create_token(.{ .LET = void{} });
         if (self.accept_string("extern")) return self.create_token(.{ .EXTERN = void{} });

@@ -19,6 +19,9 @@ pub const Node = union(enum) {
         lhs: *Node,
         rhs: *Node,
     },
+    IMPORT_DECLARATION: struct {
+        filename: []u8,
+    },
     FUNCTION_CALL_STATEMENT: struct {
         expression: *Node,
         arguments: []*Node,
@@ -146,6 +149,7 @@ pub const Parser = struct {
             self.accept_parse(parse_while_statement) orelse
             self.accept_parse(parse_return_statement) orelse
             self.accept_parse(parse_assignment_statement) orelse
+            self.accept_parse(parse_import_declaration) orelse
             try self.parse_extern_declaration();
 
         _ = try self.parse_token(tokenizer.TokenType.SEMICOLON);
@@ -183,6 +187,23 @@ pub const Parser = struct {
                 .is_dereference = is_dereference,
                 .lhs = lhs,
                 .rhs = rhs,
+            },
+        });
+    }
+
+    // ImportDeclaration ::= "import" STRING
+    fn parse_import_declaration(self: *Parser) ParserError!*Node {
+        errdefer if (!self.try_context) std.debug.print("Error parsing import declaration {any}\n", .{self.peek_token()});
+
+        _ = try self.parse_token(.IMPORT);
+
+        const expr = try self.parse_primary_expression();
+
+        std.debug.assert(expr.PRIMARY_EXPRESSION == .STRING);
+
+        return self.create_node(.{
+            .IMPORT_DECLARATION = .{
+                .filename = "",
             },
         });
     }

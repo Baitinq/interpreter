@@ -116,6 +116,7 @@ pub const CodeGen = struct {
             .RETURN_STATEMENT => |*return_statement| return try self.generate_return_statement(@ptrCast(return_statement)),
             .IF_STATEMENT => |*if_statement| return try self.generate_if_statement(@ptrCast(if_statement)),
             .WHILE_STATEMENT => |*while_statement| return try self.generate_while_statement(@ptrCast(while_statement)),
+            .IMPORT_DECLARATION => |*import_declaration| return try self.generate_import_declaration(),
             else => unreachable,
         }
     }

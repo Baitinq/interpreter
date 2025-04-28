@@ -1,8 +1,10 @@
 Program      ::= Statement+
 
-Statement    ::= (AssignmentStatement | ExternDeclaration | FunctionCallStatement | IfStatement | WhileStatement | ReturnStatement) SEMICOLON
+Statement    ::= (AssignmentStatement | ImportDeclaration | ExternDeclaration | FunctionCallStatement | IfStatement | WhileStatement | ReturnStatement) SEMICOLON
 
 AssignmentStatement ::= ("let")? ("*")? Expression EQUALS Expression
+
+ImportDeclaration ::= "import" STRING
 
 ExternDeclaration ::= "extern" IDENTIFIER EQUALS Type
 

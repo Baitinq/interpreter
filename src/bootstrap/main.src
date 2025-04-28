@@ -9,6 +9,8 @@ extern fclose = (*i8) => *i8;
 extern malloc = (i64) => *i8;
 extern free = (*i8) => void;
 
+import "tokenizer.src";
+
 let file_size = 0;
 let file = 0;
 let buf = 0;
